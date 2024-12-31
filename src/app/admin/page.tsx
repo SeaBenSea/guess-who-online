@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react';
 import { roomStore } from '@/utils/roomStore';
 import { characterStore } from '@/utils/characterStore';
 import { useRouter } from 'next/navigation';
-import Cookies from 'js-cookie';
 import Navbar from '@/components/Navbar';
 import { PoolCharacter } from '@/types/poolCharacter';
+import { Character, CHARACTER_EMOJIS } from '@/types/character';
 
-type AdminTab = 'overview' | 'rooms' | 'characters' | 'tests' | 'system';
+type AdminTab = 'overview' | 'rooms' | 'characters' | 'tests' | 'system' | 'users';
 
 interface PlayerState {
+  id: string;
   name: string;
   isReady?: boolean;
 }
@@ -49,21 +50,44 @@ interface SystemHealth {
   }>;
 }
 
+interface AdminUser {
+  id: string;
+  email: string;
+  metadata: {
+    is_admin: boolean;
+    username?: string;
+    [key: string]: boolean | string | undefined;
+  };
+  lastVerified: string;
+}
+
+interface User {
+  id: string;
+  email: string;
+  user_metadata: {
+    username?: string;
+    is_admin?: boolean;
+    [key: string]: boolean | string | undefined;
+  };
+  created_at: string;
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingAccess, setIsCheckingAccess] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
   const [stats, setStats] = useState<AdminStats>({
     totalRooms: 0,
     activeRooms: 0,
     totalCharacters: 0,
   });
+  const [characters, setCharacters] = useState<Character[]>([]);
   const [rooms, setRooms] = useState<RoomDetails[]>([]);
-  const [roomFilter, setRoomFilter] = useState('all'); // 'all' | 'active' | 'inactive'
+  const [roomFilter, setRoomFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [systemHealth, setSystemHealth] = useState<SystemHealth>({
     dbStatus: 'connected',
@@ -72,15 +96,39 @@ export default function AdminPage() {
     avgResponseTime: 0,
     errorLogs: [],
   });
+  const [users, setUsers] = useState<User[]>([]);
+  const [userFilter, setUserFilter] = useState('all');
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [isUpdatingRole, setIsUpdatingRole] = useState(false);
 
-  // Check if already authenticated
+  // Check if user is admin
   useEffect(() => {
-    const isAuth = Cookies.get('adminPageAuth') === 'true';
-    setIsAuthenticated(isAuth);
-    if (isAuth) {
-      loadStats();
-    }
-  }, []);
+    const checkAdminAccess = async () => {
+      setIsCheckingAccess(true);
+      try {
+        const response = await fetch('/api/admin/check-access');
+        const data = await response.json();
+
+        if (!response.ok) {
+          console.error('Admin access denied:', data.error);
+          router.push('/');
+          return;
+        }
+
+        // Store admin user data
+        setIsAuthenticated(true);
+        setAdminUser(data.user);
+        loadStats();
+      } catch (error) {
+        console.error('Error checking admin access:', error);
+        router.push('/');
+      } finally {
+        setIsCheckingAccess(false);
+      }
+    };
+
+    checkAdminAccess();
+  }, [router]);
 
   const loadStats = async () => {
     setIsLoading(true);
@@ -104,21 +152,6 @@ export default function AdminPage() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handlePasswordSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const correctPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
-
-    if (password === correctPassword) {
-      Cookies.set('adminPageAuth', 'true', { expires: 1 }); // Expires in 1 day
-      setIsAuthenticated(true);
-      setError('');
-      loadStats();
-    } else {
-      setError('Incorrect password');
-    }
-    setPassword('');
   };
 
   const runConnectionTest = async () => {
@@ -274,33 +307,144 @@ export default function AdminPage() {
     }
   }, [isAuthenticated, activeTab]);
 
+  const handleLogout = () => {
+    router.push('/');
+  };
+
+  // Load users
+  const loadUsers = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/admin/users');
+      if (!response.ok) {
+        throw new Error('Failed to load users');
+      }
+      const data = await response.json();
+      setUsers(data);
+    } catch (error) {
+      console.error('Error loading users:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAuthenticated && activeTab === 'users') {
+      loadUsers();
+    }
+  }, [isAuthenticated, activeTab]);
+
+  const handleRoleUpdate = async (userId: string, isAdmin: boolean) => {
+    if (!window.confirm(`Are you sure you want to ${isAdmin ? 'grant' : 'revoke'} admin access for this user?`)) {
+      return;
+    }
+
+    setIsUpdatingRole(true);
+    try {
+      const response = await fetch('/api/admin/set-role', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId, isAdmin }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update user role');
+      }
+
+      // Reload users to get updated data
+      await loadUsers();
+    } catch (error) {
+      console.error('Error updating user role:', error);
+      alert('Failed to update user role');
+    } finally {
+      setIsUpdatingRole(false);
+    }
+  };
+
+  const filteredUsers = users
+    .filter(user => {
+      if (userFilter === 'admin') return user.user_metadata?.is_admin === true;
+      if (userFilter === 'regular') return !user.user_metadata?.is_admin;
+      return true;
+    })
+    .filter(
+      user =>
+        user.email.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+        user.user_metadata?.username?.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+        user.id.toLowerCase().includes(userSearchQuery.toLowerCase())
+    );
+
+  // Load characters when the characters tab is active
+  useEffect(() => {
+    if (isAuthenticated && activeTab === 'characters') {
+      loadCharacters();
+    }
+  }, [isAuthenticated, activeTab]);
+
+  const loadCharacters = async () => {
+    setIsLoading(true);
+    try {
+      await characterStore.loadCharacters();
+      setCharacters(characterStore.getCharacters());
+    } catch (error) {
+      console.error('Error loading characters:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteCharacter = async (characterId: string) => {
+    if (!window.confirm('Are you sure you want to delete this character? This action cannot be undone.')) {
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/admin/characters/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ characterId }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete character');
+      }
+
+      await loadCharacters();
+      await loadStats();
+    } catch (error) {
+      console.error('Error deleting character:', error);
+      alert(error instanceof Error ? error.message : 'Failed to delete character');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isCheckingAccess) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center p-24">
+        <div className="w-full max-w-md bg-white/5 p-8 rounded-lg shadow-lg">
+          <h1 className="text-2xl font-bold text-center mb-6">Admin Panel</h1>
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-gray-400">Verifying admin access...</p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   if (!isAuthenticated) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center p-24">
         <div className="w-full max-w-md bg-white/5 p-8 rounded-lg shadow-lg">
           <h1 className="text-2xl font-bold text-center mb-6">Admin Panel</h1>
-          <form onSubmit={handlePasswordSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium mb-2">
-                Enter Password
-              </label>
-              <input
-                type="password"
-                id="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500"
-                required
-              />
-              {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
-            </div>
-            <button
-              type="submit"
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              Access Admin Panel
-            </button>
-          </form>
+          <p className="text-center text-red-500">Access denied. You need admin privileges to view this page.</p>
         </div>
       </main>
     );
@@ -312,12 +456,16 @@ export default function AdminPage() {
       <div className="flex min-h-screen flex-col items-center p-24">
         <div className="z-10 w-full max-w-6xl space-y-6">
           <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold">Admin Panel</h1>
+            <div>
+              <h1 className="text-2xl font-bold">Admin Panel</h1>
+              {adminUser && (
+                <p className="text-sm text-gray-400">
+                  Logged in as {adminUser.email} | Last verified: {new Date(adminUser.lastVerified).toLocaleTimeString()}
+                </p>
+              )}
+            </div>
             <button
-              onClick={() => {
-                Cookies.remove('adminPageAuth');
-                router.refresh();
-              }}
+              onClick={handleLogout}
               className="px-4 py-2 text-sm text-red-500 hover:text-red-600"
             >
               Logout
@@ -327,7 +475,7 @@ export default function AdminPage() {
           {/* Navigation Tabs */}
           <div className="border-b border-gray-600">
             <nav className="flex gap-4">
-              {(['overview', 'rooms', 'characters', 'tests', 'system'] as AdminTab[]).map(tab => (
+              {(['overview', 'rooms', 'characters', 'users', 'tests', 'system'] as AdminTab[]).map(tab => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -454,14 +602,89 @@ export default function AdminPage() {
             )}
 
             {activeTab === 'characters' && (
-              <div className="space-y-4">
-                <button
-                  onClick={() => router.push('/characters')}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  Manage Characters
-                </button>
-                {/* Character management features can be added here */}
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row justify-between gap-4">
+                  <div className="flex gap-4">
+                    <input
+                      type="text"
+                      placeholder="Search characters..."
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      className="px-3 py-2 bg-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <button
+                    onClick={() => router.push('/characters')}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    Add New Character
+                  </button>
+                </div>
+
+                {isLoading ? (
+                  <div className="flex justify-center items-center py-8">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                      <p className="text-gray-400">Loading characters...</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left border-b border-gray-600">
+                          <th className="p-3">Name</th>
+                          <th className="p-3">Type</th>
+                          <th className="p-3">Created By</th>
+                          <th className="p-3">Created At</th>
+                          <th className="p-3">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {characters
+                          .filter(char => 
+                            char.name.toLowerCase().includes(searchQuery.toLowerCase())
+                          )
+                          .map(character => (
+                            <tr key={character.id} className="border-b border-gray-700/50 hover:bg-white/5">
+                              <td className="p-3">{character.name}</td>
+                              <td className="p-3">
+                                <span className="flex items-center gap-2">
+                                  <span role="img" aria-label={character.type}>
+                                    {CHARACTER_EMOJIS[character.type]}
+                                  </span>
+                                  {character.type
+                                    .split('_')
+                                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                    .join(' ')}
+                                </span>
+                              </td>
+                              <td className="p-3">
+                                {users.find(u => u.id === character.createdBy)?.email || character.createdBy}
+                              </td>
+                              <td className="p-3">{new Date(character.createdAt).toLocaleDateString()}</td>
+                              <td className="p-3">
+                                <button
+                                  onClick={() => handleDeleteCharacter(character.id)}
+                                  disabled={isLoading}
+                                  className="text-red-500 hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  Delete
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        {characters.length === 0 && (
+                          <tr>
+                            <td colSpan={5} className="p-3 text-center text-gray-400">
+                              No characters found
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
 
@@ -577,6 +800,82 @@ export default function AdminPage() {
                       </tbody>
                     </table>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'users' && (
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row justify-between gap-4">
+                  <div className="flex gap-4">
+                    <select
+                      value={userFilter}
+                      onChange={e => setUserFilter(e.target.value)}
+                      className="px-3 py-2 bg-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="all">All Users</option>
+                      <option value="admin">Admins</option>
+                      <option value="regular">Regular Users</option>
+                    </select>
+                    <input
+                      type="text"
+                      placeholder="Search by email, username, or ID..."
+                      value={userSearchQuery}
+                      onChange={e => setUserSearchQuery(e.target.value)}
+                      className="px-3 py-2 bg-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left border-b border-gray-600">
+                        <th className="p-3">ID</th>
+                        <th className="p-3">Email</th>
+                        <th className="p-3">Username</th>
+                        <th className="p-3">Role</th>
+                        <th className="p-3">Created At</th>
+                        <th className="p-3">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredUsers.map(user => (
+                        <tr key={user.id} className="border-b border-gray-700/50 hover:bg-white/5">
+                          <td className="p-3">
+                            <span className="font-mono text-xs">{user.id}</span>
+                          </td>
+                          <td className="p-3">{user.email}</td>
+                          <td className="p-3">{user.user_metadata?.username || '-'}</td>
+                          <td className="p-3">
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs ${
+                                user.user_metadata?.is_admin
+                                  ? 'bg-blue-500/20 text-blue-300'
+                                  : 'bg-gray-500/20 text-gray-300'
+                              }`}
+                            >
+                              {user.user_metadata?.is_admin ? 'Admin' : 'User'}
+                            </span>
+                          </td>
+                          <td className="p-3">{new Date(user.created_at).toLocaleDateString()}</td>
+                          <td className="p-3">
+                            <button
+                              onClick={() => handleRoleUpdate(user.id, !user.user_metadata?.is_admin)}
+                              disabled={isUpdatingRole || user.id === adminUser?.id}
+                              className={`px-2 py-1 text-xs rounded ${
+                                user.user_metadata?.is_admin
+                                  ? 'bg-red-600 hover:bg-red-700'
+                                  : 'bg-blue-600 hover:bg-blue-700'
+                              } text-white disabled:opacity-50 disabled:cursor-not-allowed`}
+                            >
+                              {user.user_metadata?.is_admin ? 'Remove Admin' : 'Make Admin'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
