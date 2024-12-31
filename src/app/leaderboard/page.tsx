@@ -1,36 +1,52 @@
 'use client';
 
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useEffect, useState } from 'react';
 import Navbar from '@/components/Navbar';
 
 interface LeaderboardEntry {
-  nickname: string;
+  user_id: string;
   games_played: number;
   wins: number;
+  user_metadata?: {
+    username: string;
+  };
 }
 
 export default function LeaderboardPage() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const supabase = createClientComponentClient();
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchLeaderboard() {
-      const { data, error } = await supabase
-        .from('leaderboard')
-        .select('*')
-        .order('wins', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching leaderboard:', error);
-        return;
+      try {
+        const response = await fetch('/api/leaderboard');
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to fetch leaderboard');
+        }
+        const data = await response.json();
+        setLeaderboard(data);
+      } catch (err) {
+        console.error('Error fetching leaderboard:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch leaderboard');
       }
-
-      setLeaderboard(data || []);
     }
 
     fetchLeaderboard();
-  }, [supabase]);
+  }, []);
+
+  if (error) {
+    return (
+      <main className="min-h-screen flex flex-col">
+        <Navbar />
+        <div className="flex-1 p-24">
+          <div className="max-w-5xl mx-auto font-mono">
+            <div className="text-red-500 text-center">{error}</div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen flex flex-col">
@@ -55,13 +71,13 @@ export default function LeaderboardPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {leaderboard.map((entry, index) => (
-                    <tr key={entry.nickname} className="hover:bg-gray-50 transition-colors">
+                    <tr key={entry.user_id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4">
                         <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-yellow-100 text-yellow-800 font-bold">
                           {index + 1}
                         </span>
                       </td>
-                      <td className="px-6 py-4 font-semibold text-gray-900">{entry.nickname}</td>
+                      <td className="px-6 py-4 font-semibold text-gray-900">{entry.user_metadata?.username || 'Unknown Player'}</td>
                       <td className="px-6 py-4 text-gray-600">{entry.games_played}</td>
                       <td className="px-6 py-4">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-green-100 text-green-800">

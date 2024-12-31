@@ -1,10 +1,11 @@
-import { supabase } from './supabase';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { Character } from '@/types/character';
 import { PoolCharacter } from '@/types/poolCharacter';
 
 interface PlayerState {
-  name: string;
+  id: string;  // user ID
+  name: string; // display name (nickname)
   isReady?: boolean;
 }
 
@@ -14,13 +15,15 @@ interface Room {
   players: PlayerState[];
   is_game_started: boolean;
   character_pool?: PoolCharacter[];
-  player_picks?: { [key: string]: string }; // nickname -> characterId
-  player_picks_state?: { [key: string]: { characterId?: string; isReady: boolean } }; // nickname -> pick state
-  player_guesses?: { [key: string]: { characterId: string; timestamp: string }[] }; // nickname -> guesses
-  winner?: string; // nickname of winner
+  player_picks?: { [key: string]: string }; //userId -> characterId
+  player_picks_state?: { [key: string]: { characterId?: string; isReady: boolean } }; //userId -> pick state
+  player_guesses?: { [key: string]: { characterId: string; timestamp: string }[] }; //userId -> guesses
+  winner?: string; //userId of winner
 }
 
 class RoomStore {
+  private supabase = createClientComponentClient();
+
   private debug(method: string, ...args: unknown[]) {
     console.log(`[RoomStore][${method}]`, ...args);
   }
@@ -29,7 +32,7 @@ class RoomStore {
 
   async loadRooms(): Promise<void> {
     this.debug('loadRooms', 'Loading all rooms');
-    const { data, error } = await supabase
+    const { data, error } = await this.supabase
       .from('rooms')
       .select('*')
       .order('created_at', { ascending: false });
@@ -52,7 +55,7 @@ class RoomStore {
 
   async createRoom(code: string): Promise<boolean> {
     this.debug('createRoom', { code });
-    const { error } = await supabase.from('rooms').insert([
+    const { error } = await this.supabase.from('rooms').insert([
       {
         id: code,
         players: [],
@@ -69,7 +72,7 @@ class RoomStore {
 
   async roomExists(code: string): Promise<boolean> {
     this.debug('roomExists:check', { code });
-    const { data, error } = await supabase.from('rooms').select('id').eq('id', code).single();
+    const { data, error } = await this.supabase.from('rooms').select('id').eq('id', code).single();
 
     const exists = !error && !!data;
     this.debug('roomExists:result', { code, exists, error: error?.message });
@@ -78,10 +81,11 @@ class RoomStore {
 
   async canJoinRoom(
     code: string,
-    nickname: string
+    userId: string,
+    displayName: string
   ): Promise<{ canJoin: boolean; reason?: string }> {
-    this.debug('canJoinRoom:check', { code, nickname });
-    const { data, error } = await supabase
+    this.debug('canJoinRoom:check', { code, userId, displayName });
+    const { data, error } = await this.supabase
       .from('rooms')
       .select('players, is_game_started')
       .eq('id', code)
@@ -102,25 +106,25 @@ class RoomStore {
       return { canJoin: false, reason: 'Room is full' };
     }
 
-    // Check if nickname is already taken in this room
-    const isNicknameTaken = data.players.some(
-      (p: PlayerState) => p.name.toLowerCase() === nickname.toLowerCase()
+    // Check if user is already in this room
+    const isUserInRoom = data.players.some(
+      (p: PlayerState) => p.id === userId
     );
 
-    if (isNicknameTaken) {
-      this.debug('canJoinRoom:nicknameTaken', { code, nickname, currentPlayers: data.players });
-      return { canJoin: false, reason: 'Nickname is already taken in this room' };
+    if (isUserInRoom) {
+      this.debug('canJoinRoom:userAlreadyInRoom', { code, userId, currentPlayers: data.players });
+      return { canJoin: false, reason: 'You are already in this room' };
     }
 
-    this.debug('canJoinRoom:success', { code, nickname });
+    this.debug('canJoinRoom:success', { code, userId });
     return { canJoin: true };
   }
 
-  async joinRoom(code: string, nickname: string): Promise<boolean> {
-    this.debug('joinRoom:start', { code, nickname });
+  async joinRoom(code: string, userId: string, displayName: string): Promise<boolean> {
+    this.debug('joinRoom:start', { code, userId, displayName });
 
     // First, get the current room state
-    const { data: room, error: fetchError } = await supabase
+    const { data: room, error: fetchError } = await this.supabase
       .from('rooms')
       .select('players')
       .eq('id', code)
@@ -132,22 +136,23 @@ class RoomStore {
     }
 
     // Check if player can join
-    const { canJoin, reason } = await this.canJoinRoom(code, nickname);
+    const { canJoin, reason } = await this.canJoinRoom(code, userId, displayName);
     if (!canJoin) {
       this.debug('joinRoom:cannotJoin', { reason });
       return false;
     }
 
     // Update the room with the new player
-    const updatedPlayers = [...room.players, { name: nickname }];
+    const updatedPlayers = [...room.players, { id: userId, name: displayName }];
     this.debug('joinRoom:updating', {
       code,
-      nickname,
+      userId,
+      displayName,
       currentPlayers: room.players,
       updatedPlayers,
     });
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await this.supabase
       .from('rooms')
       .update({ players: updatedPlayers })
       .eq('id', code);
@@ -157,16 +162,16 @@ class RoomStore {
       return false;
     }
 
-    this.debug('joinRoom:success', { code, nickname, updatedPlayers });
+    this.debug('joinRoom:success', { code, userId, displayName, updatedPlayers });
     return true;
   }
 
-  async leaveRoom(code: string, nickname: string): Promise<boolean> {
-    this.debug('leaveRoom:start', { code, nickname });
+  async leaveRoom(code: string, userId: string): Promise<boolean> {
+    this.debug('leaveRoom:start', { code, userId });
 
     try {
       // Get current room state
-      const { data: room, error: fetchError } = await supabase
+      const { data: room, error: fetchError } = await this.supabase
         .from('rooms')
         .select('players, is_game_started, winner')
         .eq('id', code)
@@ -179,23 +184,23 @@ class RoomStore {
 
       this.debug('leaveRoom:currentState', {
         code,
-        nickname,
+        userId,
         currentPlayers: room.players,
       });
 
       // If game is in progress and no winner yet, set opponent as winner
       if (room.is_game_started && !room.winner) {
-        const opponent = room.players.find((p: PlayerState) => p.name !== nickname);
+        const opponent = room.players.find((p: PlayerState) => p.id !== userId);
         if (opponent) {
-          await supabase.from('rooms').update({ winner: opponent.name }).eq('id', code);
+          await this.supabase.from('rooms').update({ winner: opponent.id }).eq('id', code);
 
           // Update leaderboard for forfeit
-          await this.updateLeaderboard(opponent.name, nickname);
+          await this.updateLeaderboard(opponent.id, userId);
         }
       }
 
       // Remove the player
-      const updatedPlayers = room.players.filter((p: PlayerState) => p.name !== nickname);
+      const updatedPlayers = room.players.filter((p: PlayerState) => p.id !== userId);
       this.debug('leaveRoom:afterFilter', { updatedPlayers });
 
       // If room is empty, delete it
@@ -203,7 +208,7 @@ class RoomStore {
         this.debug('leaveRoom:deletingEmptyRoom', { code });
 
         // Try to delete the room
-        const { error: deleteError } = await supabase.from('rooms').delete().eq('id', code);
+        const { error: deleteError } = await this.supabase.from('rooms').delete().eq('id', code);
 
         if (deleteError) {
           this.debug('leaveRoom:deleteError', { error: deleteError.message });
@@ -215,7 +220,7 @@ class RoomStore {
       }
 
       // Update room with remaining players
-      const { error: updateError } = await supabase
+      const { error: updateError } = await this.supabase
         .from('rooms')
         .update({ players: updatedPlayers })
         .eq('id', code);
@@ -225,7 +230,7 @@ class RoomStore {
         return false;
       }
 
-      this.debug('leaveRoom:success', { code, nickname, remainingPlayers: updatedPlayers });
+      this.debug('leaveRoom:success', { code, userId, remainingPlayers: updatedPlayers });
       return true;
     } catch (error) {
       this.debug('leaveRoom:error', { error });
@@ -233,11 +238,11 @@ class RoomStore {
     }
   }
 
-  async toggleReady(code: string, nickname: string): Promise<boolean> {
-    this.debug('toggleReady:start', { code, nickname });
+  async toggleReady(code: string, userId: string): Promise<boolean> {
+    this.debug('toggleReady:start', { code, userId });
 
     // Get current room state
-    const { data: room, error: fetchError } = await supabase
+    const { data: room, error: fetchError } = await this.supabase
       .from('rooms')
       .select('players')
       .eq('id', code)
@@ -250,18 +255,18 @@ class RoomStore {
 
     // Update player's ready status
     const updatedPlayers = room.players.map((p: PlayerState) =>
-      p.name === nickname ? { ...p, isReady: !p.isReady } : p
+      p.id === userId ? { ...p, isReady: !p.isReady } : p
     );
 
     this.debug('toggleReady:updating', {
       code,
-      nickname,
+      userId,
       currentPlayers: room.players,
       updatedPlayers,
     });
 
     // Update room
-    const { error: updateError } = await supabase
+    const { error: updateError } = await this.supabase
       .from('rooms')
       .update({ players: updatedPlayers })
       .eq('id', code);
@@ -271,13 +276,13 @@ class RoomStore {
       return false;
     }
 
-    this.debug('toggleReady:success', { code, nickname, updatedPlayers });
+    this.debug('toggleReady:success', { code, userId, updatedPlayers });
     return true;
   }
 
   async getRoom(code: string): Promise<Room | null> {
     this.debug('getRoom:start', { code });
-    const { data, error } = await supabase.from('rooms').select('*').eq('id', code).single();
+    const { data, error } = await this.supabase.from('rooms').select('*').eq('id', code).single();
 
     if (error || !data) {
       this.debug('getRoom:error', { error: error?.message });
@@ -296,12 +301,12 @@ class RoomStore {
   async cleanup(): Promise<void> {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
-    await supabase.from('rooms').delete().lt('created_at', oneHourAgo.toISOString());
+    await this.supabase.from('rooms').delete().lt('created_at', oneHourAgo.toISOString());
   }
 
   subscribeToRoom(code: string, callback: (room: Room | null) => void): RealtimeChannel {
     this.debug('subscribeToRoom', { code });
-    return supabase
+    return this.supabase
       .channel(`room:${code}`)
       .on(
         'postgres_changes' as const,
@@ -339,7 +344,7 @@ class RoomStore {
 
   async getCharacterPool(code: string): Promise<PoolCharacter[]> {
     this.debug('getCharacterPool', { code });
-    const { data, error } = await supabase
+    const { data, error } = await this.supabase
       .from('room_character_pools')
       .select(
         `
@@ -351,7 +356,8 @@ class RoomStore {
           name,
           type,
           image_url,
-          created_at
+          created_at,
+          created_by
         )
       `
       )
@@ -373,6 +379,7 @@ class RoomStore {
           type: string;
           image_url: string | null;
           created_at: string;
+          created_by: string;
         };
       }>
     ).map(item => ({
@@ -381,6 +388,7 @@ class RoomStore {
       type: item.characters.type as Character['type'],
       imageUrl: item.characters.image_url || undefined,
       createdAt: new Date(item.characters.created_at).getTime(),
+      createdBy: item.characters.created_by,
       added_by: item.added_by,
       added_at: new Date(item.added_at),
     }));
@@ -391,7 +399,7 @@ class RoomStore {
     callback: (characters: PoolCharacter[]) => void
   ): RealtimeChannel {
     this.debug('subscribeToCharacterPool', { code });
-    const channel = supabase
+    const channel = this.supabase
       .channel(`room_pool:${code}`)
       .on(
         'postgres_changes' as const,
@@ -440,14 +448,14 @@ class RoomStore {
         return { success: false, message: 'Failed to fetch test room' };
       }
 
-      const { data } = await supabase.from('rooms').select('id').eq('id', testCode);
+      const { data } = await this.supabase.from('rooms').select('id').eq('id', testCode);
       console.log(data); // Should confirm if a row exists.
 
       // Test 3: Clean up the test room
-      await supabase.from('rooms').delete().eq('id', testCode);
+      await this.supabase.from('rooms').delete().eq('id', testCode);
 
       // check if the room was deleted
-      const { data: deletedRoom } = await supabase.from('rooms').select('id').eq('id', testCode);
+      const { data: deletedRoom } = await this.supabase.from('rooms').select('id').eq('id', testCode);
       console.log(deletedRoom); // Should confirm if a row exists.
 
       return {
@@ -464,7 +472,7 @@ class RoomStore {
 
   async addCharacterToPool(code: string, characterId: string, addedBy: string): Promise<boolean> {
     this.debug('addCharacterToPool', { code, characterId, addedBy });
-    const { error } = await supabase.from('room_character_pools').insert([
+    const { error } = await this.supabase.from('room_character_pools').insert([
       {
         room_id: code,
         character_id: characterId,
@@ -481,7 +489,7 @@ class RoomStore {
 
   async removeCharacterFromPool(code: string, characterId: string): Promise<boolean> {
     this.debug('removeCharacterFromPool', { code, characterId });
-    const { error } = await supabase
+    const { error } = await this.supabase
       .from('room_character_pools')
       .delete()
       .eq('room_id', code)
@@ -496,13 +504,13 @@ class RoomStore {
 
   async pickCharacter(
     code: string,
-    nickname: string,
+    userId: string,
     characterId: string,
     isReady: boolean = false
   ): Promise<boolean> {
-    this.debug('pickCharacter', { code, nickname, characterId, isReady });
+    this.debug('pickCharacter', { code, userId, characterId, isReady });
 
-    const { data: room, error: fetchError } = await supabase
+    const { data: room, error: fetchError } = await this.supabase
       .from('rooms')
       .select('player_picks, player_picks_state')
       .eq('id', code)
@@ -518,18 +526,18 @@ class RoomStore {
 
     const updatedPicks = { ...currentPicks };
     if (characterId) {
-      updatedPicks[nickname] = characterId;
+      updatedPicks[userId] = characterId;
     }
 
     const updatedPickStates = {
       ...currentPickStates,
-      [nickname]: {
+      [userId]: {
         characterId,
         isReady,
       },
     };
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await this.supabase
       .from('rooms')
       .update({
         player_picks: updatedPicks,
@@ -547,7 +555,7 @@ class RoomStore {
 
   async startGame(code: string): Promise<boolean> {
     this.debug('startGame', { code });
-    const { error } = await supabase.from('rooms').update({ is_game_started: true }).eq('id', code);
+    const { error } = await this.supabase.from('rooms').update({ is_game_started: true }).eq('id', code);
 
     if (error) {
       this.debug('startGame:error', error);
@@ -558,7 +566,7 @@ class RoomStore {
 
   async pickCharacters(code: string, picks: { [key: string]: string }): Promise<boolean> {
     this.debug('pickCharacters', { code, picks });
-    const { error } = await supabase
+    const { error } = await this.supabase
       .from('rooms')
       .update({
         player_picks: picks,
@@ -573,10 +581,10 @@ class RoomStore {
     return true;
   }
 
-  async getGuessCount(code: string, nickname: string): Promise<number> {
-    this.debug('getGuessCount', { code, nickname });
+  async getGuessCount(code: string, userId: string): Promise<number> {
+    this.debug('getGuessCount', { code, userId });
 
-    const { data: room, error } = await supabase
+    const { data: room, error } = await this.supabase
       .from('rooms')
       .select('player_guesses')
       .eq('id', code)
@@ -587,14 +595,14 @@ class RoomStore {
       return 0;
     }
 
-    const playerGuesses = room?.player_guesses?.[nickname] || [];
+    const playerGuesses = room?.player_guesses?.[userId] || [];
     return playerGuesses.length;
   }
 
   async getWinner(code: string): Promise<string | null> {
     this.debug('getWinner', { code });
 
-    const { data: room, error } = await supabase
+    const { data: room, error } = await this.supabase
       .from('rooms')
       .select('winner')
       .eq('id', code)
@@ -608,54 +616,56 @@ class RoomStore {
     return room?.winner || null;
   }
 
-  private async updateLeaderboard(winner: string, loser: string) {
-    this.debug('updateLeaderboard', { winner, loser });
+  private async updateLeaderboard(winnerId: string, loserId: string) {
+    this.debug('updateLeaderboard', { winnerId, loserId });
 
-    // Get current stats for winner
-    const { data: existingWinner } = await supabase
-      .from('leaderboard')
-      .select('*')
-      .eq('nickname', winner)
+    // Get winner's display name
+    const { data: winnerRoom } = await this.supabase
+      .from('rooms')
+      .select('players')
+      .eq('id', winnerId)
       .single();
+    const winnerName = winnerRoom?.players?.find((p: PlayerState) => p.id === winnerId)?.name || 'Unknown';
 
-    // Get current stats for loser
-    const { data: existingLoser } = await supabase
-      .from('leaderboard')
-      .select('*')
-      .eq('nickname', loser)
+    // Get loser's display name
+    const { data: loserRoom } = await this.supabase
+      .from('rooms')
+      .select('players')
+      .eq('id', loserId)
       .single();
+    const loserName = loserRoom?.players?.find((p: PlayerState) => p.id === loserId)?.name || 'Unknown';
 
-    // Update winner stats
-    const { error: winnerError } = await supabase.from('leaderboard').upsert({
-      nickname: winner,
-      games_played: (existingWinner?.games_played || 0) + 1,
-      wins: (existingWinner?.wins || 0) + 1,
-    });
+    try {
+      const response = await fetch('/api/leaderboard/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          winnerId,
+          winnerName,
+          loserId,
+          loserName,
+        }),
+      });
 
-    if (winnerError) {
-      this.debug('updateLeaderboard:winnerError', winnerError);
+      if (!response.ok) {
+        const error = await response.json();
+        this.debug('updateLeaderboard:error', error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      this.debug('updateLeaderboard:error', error);
       return false;
     }
-
-    // Update loser stats
-    const { error: loserError } = await supabase.from('leaderboard').upsert({
-      nickname: loser,
-      games_played: (existingLoser?.games_played || 0) + 1,
-      wins: existingLoser?.wins || 0,
-    });
-
-    if (loserError) {
-      this.debug('updateLeaderboard:loserError', loserError);
-      return false;
-    }
-
-    return true;
   }
 
-  async makeGuess(code: string, nickname: string, characterId: string): Promise<boolean> {
-    this.debug('makeGuess', { code, nickname, characterId });
+  async makeGuess(code: string, userId: string, characterId: string): Promise<boolean> {
+    this.debug('makeGuess', { code, userId, characterId });
 
-    const { data: room, error: fetchError } = await supabase
+    const { data: room, error: fetchError } = await this.supabase
       .from('rooms')
       .select('player_guesses, player_picks')
       .eq('id', code)
@@ -668,11 +678,11 @@ class RoomStore {
 
     // Get current guesses
     const currentGuesses = room?.player_guesses || {};
-    const playerGuesses = currentGuesses[nickname] || [];
+    const playerGuesses = currentGuesses[userId] || [];
 
     // Check if player has already made 2 guesses
     if (playerGuesses.length >= 2) {
-      this.debug('makeGuess:tooManyGuesses', { nickname, guessCount: playerGuesses.length });
+      this.debug('makeGuess:tooManyGuesses', { userId, guessCount: playerGuesses.length });
       return false;
     }
 
@@ -684,18 +694,18 @@ class RoomStore {
 
     const updatedGuesses = {
       ...currentGuesses,
-      [nickname]: [...playerGuesses, newGuess],
+      [userId]: [...playerGuesses, newGuess],
     };
 
     // Check if this guess is correct (wins the game)
-    const opponentNickname = Object.keys(room.player_picks).find(n => n !== nickname);
-    if (opponentNickname && room.player_picks[opponentNickname] === characterId) {
+    const opponentUserId = Object.keys(room.player_picks).find(id => id !== userId);
+    if (opponentUserId && room.player_picks[opponentUserId] === characterId) {
       // Player won! Update winner and leaderboard
-      const { error: updateError } = await supabase
+      const { error: updateError } = await this.supabase
         .from('rooms')
         .update({
           player_guesses: updatedGuesses,
-          winner: nickname,
+          winner: userId,
         })
         .eq('id', code);
 
@@ -705,17 +715,17 @@ class RoomStore {
       }
 
       // Update leaderboard
-      await this.updateLeaderboard(nickname, opponentNickname);
+      await this.updateLeaderboard(userId, opponentUserId);
       return true;
     }
 
     // If this was their second wrong guess, they lose
-    if (opponentNickname && playerGuesses.length === 1) {
-      const { error: updateError } = await supabase
+    if (opponentUserId && playerGuesses.length === 1) {
+      const { error: updateError } = await this.supabase
         .from('rooms')
         .update({
           player_guesses: updatedGuesses,
-          winner: opponentNickname, // Set opponent as winner
+          winner: opponentUserId, // Set opponent as winner
         })
         .eq('id', code);
 
@@ -725,12 +735,12 @@ class RoomStore {
       }
 
       // Update leaderboard
-      await this.updateLeaderboard(opponentNickname, nickname);
+      await this.updateLeaderboard(opponentUserId, userId);
       return true;
     }
 
     // Update guesses only
-    const { error: updateError } = await supabase
+    const { error: updateError } = await this.supabase
       .from('rooms')
       .update({ player_guesses: updatedGuesses })
       .eq('id', code);
@@ -747,7 +757,7 @@ class RoomStore {
     this.debug('deleteRoom:start', { roomId });
 
     try {
-      const { error } = await supabase.from('rooms').delete().eq('id', roomId);
+      const { error } = await this.supabase.from('rooms').delete().eq('id', roomId);
 
       if (error) {
         this.debug('deleteRoom:error', { error: error.message });

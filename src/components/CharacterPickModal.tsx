@@ -3,7 +3,8 @@ import { PoolCharacter } from '@/types/poolCharacter';
 import Image from 'next/image';
 
 interface PlayerPickState {
-  nickname: string;
+  id: string;
+  name: string;
   characterId?: string;
   isReady: boolean;
 }
@@ -13,6 +14,7 @@ interface CharacterPickModalProps {
   poolCharacters: PoolCharacter[];
   onPick: (characterId: string) => void;
   onReady: () => void;
+  playerId: string;
   playerName: string;
   players: PlayerPickState[];
 }
@@ -22,12 +24,13 @@ export default function CharacterPickModal({
   poolCharacters,
   onPick,
   onReady,
+  playerId,
   playerName,
   players,
 }: CharacterPickModalProps) {
   if (!isOpen) return null;
 
-  const myState = players.find(p => p.nickname === playerName);
+  const myState = players.find(p => p.id === playerId);
   const canReady = !!myState?.characterId && !myState.isReady;
 
   return (
@@ -38,10 +41,10 @@ export default function CharacterPickModal({
           <h2 className="text-2xl font-bold mb-4 text-center">Player Status</h2>
           <div className="grid grid-cols-2 gap-4">
             {players.map(player => (
-              <div key={player.nickname} className="p-4 bg-white/5 rounded-lg">
+              <div key={player.id} className="p-4 bg-white/5 rounded-lg">
                 <div className="flex items-center justify-between">
                   <span className="text-lg">
-                    {player.nickname} {player.nickname === playerName && '(You)'}
+                    {player.name} {player.id === playerId && '(You)'}
                   </span>
                   <span
                     className={`text-sm ${

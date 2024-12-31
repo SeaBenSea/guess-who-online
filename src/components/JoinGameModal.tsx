@@ -7,16 +7,17 @@ import { roomStore } from '@/utils/roomStore';
 interface JoinGameModalProps {
   isOpen: boolean;
   onClose: () => void;
-  playerNickname: string | null;
+  userId: string | null;
+  displayName: string | null;
 }
 
-export default function JoinGameModal({ isOpen, onClose, playerNickname }: JoinGameModalProps) {
+export default function JoinGameModal({ isOpen, onClose, userId, displayName }: JoinGameModalProps) {
   const router = useRouter();
   const [roomCode, setRoomCode] = useState('');
   const [error, setError] = useState('');
   const [isJoining, setIsJoining] = useState(false);
 
-  if (!isOpen || !playerNickname) return null;
+  if (!isOpen || !userId || !displayName) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,29 +26,36 @@ export default function JoinGameModal({ isOpen, onClose, playerNickname }: JoinG
 
     try {
       const code = roomCode.toUpperCase();
+      console.log('[JoinModal] Attempting to join room:', code);
 
       const exists = await roomStore.roomExists(code);
+      console.log('[JoinModal] Room exists:', exists);
+      
       if (!exists) {
         setError('Room does not exist');
         return;
       }
 
-      const { canJoin, reason } = await roomStore.canJoinRoom(code, playerNickname);
+      const { canJoin, reason } = await roomStore.canJoinRoom(code, userId, displayName);
+      console.log('[JoinModal] Can join room:', canJoin, 'Reason:', reason);
+      
       if (!canJoin) {
         setError(reason || 'Cannot join room');
         return;
       }
 
-      const joined = await roomStore.joinRoom(code, playerNickname);
+      const joined = await roomStore.joinRoom(code, userId, displayName);
+      console.log('[JoinModal] Join result:', joined);
 
       if (joined) {
+        console.log('[JoinModal] Successfully joined room, navigating...');
         router.push(`/room/${code}`);
       } else {
         setError('Failed to join room');
       }
     } catch (error) {
+      console.error('[JoinModal] Join room error:', error);
       setError('An error occurred while joining the room');
-      console.error('Join room error:', error);
     } finally {
       setIsJoining(false);
     }

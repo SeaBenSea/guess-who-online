@@ -23,18 +23,23 @@ ALTER TABLE public.rooms
 ALTER TABLE public.rooms ENABLE ROW LEVEL SECURITY;
 
 -- Create policies
-CREATE POLICY "Enable read access for all users" ON public.rooms
-    FOR SELECT USING (true);
+CREATE POLICY "Enable insert for authenticated users only"
+ON public.rooms
+FOR INSERT
+TO authenticated
+WITH CHECK (true);
 
-CREATE POLICY "Enable insert for authenticated users only" ON public.rooms
-    FOR INSERT WITH CHECK (true);
+CREATE POLICY "Enable update for authenticated users only"
+ON public.rooms
+FOR UPDATE
+TO authenticated
+USING (true);
 
-CREATE POLICY "Enable update for authenticated users only" ON public.rooms
-    FOR UPDATE USING (true);
-
-CREATE POLICY "Enable delete for authenticated users only" ON public.rooms
-    FOR DELETE USING (true);
+CREATE POLICY "Enable delete for authenticated users only"
+ON public.rooms
+FOR DELETE
+TO authenticated
+USING (true);
 
 -- Enable realtime
 ALTER PUBLICATION supabase_realtime ADD TABLE rooms; 
-
