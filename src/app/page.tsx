@@ -1,38 +1,73 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { generateRoomCode } from '@/utils/roomCode';
 import { roomStore } from '@/utils/roomStore';
 import JoinGameModal from '@/components/JoinGameModal';
-import NicknameInput from '@/components/NicknameInput';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { Session } from '@supabase/supabase-js';
 
 export default function Home() {
   const router = useRouter();
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [playerNickname, setPlayerNickname] = useState<string | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const supabase = createClientComponentClient();
+
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('[Home] Initial session:', session?.user?.email, session?.user?.user_metadata);
+      setSession(session);
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log('[Home] Auth state changed:', _event, session?.user?.email);
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase.auth]);
 
   const handleCreateGame = async () => {
-    if (!playerNickname) return;
+    console.log('[Home] Creating game, session:', session?.user?.email);
+    if (!session) {
+      console.log('[Home] No session, cannot create game');
+      return;
+    }
 
     setIsCreating(true);
     try {
       const roomCode = generateRoomCode();
+      console.log('[Home] Generated room code:', roomCode);
 
       const created = await roomStore.createRoom(roomCode);
+      console.log('[Home] Room creation result:', created);
+      
       if (!created) {
         throw new Error('Failed to create room');
       }
 
-      const joined = await roomStore.joinRoom(roomCode, playerNickname);
+      const joined = await roomStore.joinRoom(
+        roomCode, 
+        session.user.id,
+        session.user.user_metadata.username
+      );
+      console.log('[Home] Room join result:', joined);
+      
       if (!joined) {
         throw new Error('Failed to join room');
       }
 
+      console.log('[Home] Successfully created and joined room:', roomCode);
       router.push(`/room/${roomCode}`);
     } catch (error) {
-      console.error('Failed to create game room:', error);
+      console.error('[Home] Failed to create game room:', error);
       alert('Failed to create game room. Please try again.');
     } finally {
       setIsCreating(false);
@@ -51,31 +86,50 @@ export default function Home() {
         <p className="text-xl text-center mb-8">
           The classic game of deduction, now playable online with friends!
         </p>
-        {playerNickname ? (
+
+        {!session ? (
+          <div className="flex flex-col items-center gap-4 mb-8">
+            <p className="text-lg text-center text-gray-600 mb-4">
+              Sign in to start playing!
+            </p>
+            <div className="flex justify-center gap-4">
+              <Link
+                href="/auth/signin"
+                className="px-6 py-3 text-lg font-semibold text-white bg-violet-500 rounded-lg hover:bg-violet-600 transition-colors"
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/auth/signup"
+                className="px-6 py-3 text-lg font-semibold text-white bg-purple-500 rounded-lg hover:bg-purple-600 transition-colors"
+              >
+                Sign Up
+              </Link>
+            </div>
+            <p className="text-sm text-gray-500 mt-4">
+              ───── Sign in to access game features ─────
+            </p>
+          </div>
+        ) : (
           <div className="text-center mb-8">
             <p className="text-lg">
-              Playing as: <span className="font-bold">{playerNickname}</span>
+              Playing as: <span className="font-bold">{session.user.user_metadata.username}</span>
             </p>
-            <button
-              onClick={() => setPlayerNickname(null)}
-              className="text-sm text-blue-500 hover:text-blue-600 mt-2"
-            >
-              Change Nickname
-            </button>
           </div>
-        ) : null}
+        )}
+
         <div className="flex flex-col items-center gap-4">
           <div className="flex justify-center gap-4">
             <button
               onClick={handleCreateGame}
-              disabled={isCreating || !playerNickname}
+              disabled={isCreating || !session}
               className="px-6 py-3 text-lg font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
             >
               {isCreating ? 'Creating...' : 'Create Game'}
             </button>
             <button
               onClick={() => setIsJoinModalOpen(true)}
-              disabled={!playerNickname}
+              disabled={!session}
               className="px-6 py-3 text-lg font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
             >
               Join Game
@@ -84,26 +138,29 @@ export default function Home() {
 
           <button
             onClick={() => router.push('/characters')}
-            className="px-6 py-3 text-lg font-semibold text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors"
+            disabled={!session}
+            className="px-6 py-3 text-lg font-semibold text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
           >
             Manage Characters
           </button>
           <button
             onClick={() => router.push('/leaderboard')}
-            className="px-6 py-3 text-lg font-semibold text-white bg-yellow-600 rounded-lg hover:bg-yellow-700 transition-colors"
+            disabled={!session}
+            className="px-6 py-3 text-lg font-semibold text-white bg-yellow-600 rounded-lg hover:bg-yellow-700 transition-colors disabled:opacity-50"
           >
             Leaderboard
           </button>
         </div>
       </div>
 
-      <NicknameInput isVisible={!playerNickname} onSubmit={setPlayerNickname} />
-
-      <JoinGameModal
-        isOpen={isJoinModalOpen}
-        onClose={() => setIsJoinModalOpen(false)}
-        playerNickname={playerNickname}
-      />
+      {session && (
+        <JoinGameModal
+          isOpen={isJoinModalOpen}
+          onClose={() => setIsJoinModalOpen(false)}
+          userId={session.user.id}
+          displayName={session.user.user_metadata.username}
+        />
+      )}
     </main>
   );
 }

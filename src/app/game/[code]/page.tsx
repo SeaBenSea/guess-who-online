@@ -6,8 +6,9 @@ import { useRouter } from 'next/navigation';
 import { roomStore } from '@/utils/roomStore';
 import { CHARACTER_EMOJIS, CharacterType } from '@/types/character';
 import { PoolCharacter } from '@/types/poolCharacter';
-import Cookies from 'js-cookie';
 import Image from 'next/image';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { Session } from '@supabase/supabase-js';
 
 interface GameBoardProps {
   params: Promise<{
@@ -23,21 +24,48 @@ export default function GameBoard({ params }: GameBoardProps) {
   const router = useRouter();
   const { code } = use(params);
   const [nickname, setNickname] = useState<string>('');
+  const [userId, setUserId] = useState<string>('');
   const [poolCharacters, setPoolCharacters] = useState<PoolCharacter[]>([]);
   const [eliminated, setEliminated] = useState<EliminatedState>({});
   const [guessCount, setGuessCount] = useState(0);
   const [winner, setWinner] = useState<string | null>(null);
+  const [winnerName, setWinnerName] = useState<string | null>(null);
   const [isGuessing, setIsGuessing] = useState(false);
   const [playerPicks, setPlayerPicks] = useState<{ [key: string]: string }>({});
+  const [playerNames, setPlayerNames] = useState<{ [key: string]: string }>({});
+  const [session, setSession] = useState<Session | null>(null);
+  const supabase = createClientComponentClient();
 
   useEffect(() => {
-    // Get the stored nickname
-    const storedNickname = Cookies.get('playerNickname');
-    if (!storedNickname) {
-      router.replace('/');
-      return;
-    }
-    setNickname(storedNickname);
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (!session?.user?.user_metadata?.username) {
+        router.replace('/');
+        return;
+      }
+      setNickname(session.user.user_metadata.username);
+      setUserId(session.user.id);
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (!session?.user?.user_metadata?.username) {
+        router.replace('/');
+        return;
+      }
+      setNickname(session.user.user_metadata.username);
+      setUserId(session.user.id);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [router, supabase.auth]);
+
+  useEffect(() => {
+    if (!session?.user?.user_metadata?.username || !userId) return;
 
     // Load initial game state
     const loadGameState = async () => {
@@ -50,15 +78,26 @@ export default function GameBoard({ params }: GameBoardProps) {
       const pool = await roomStore.getCharacterPool(code);
       setPoolCharacters(pool);
 
-      const count = await roomStore.getGuessCount(code, storedNickname);
+      const count = await roomStore.getGuessCount(code, userId);
       setGuessCount(count);
 
-      const currentWinner = await roomStore.getWinner(code);
-      setWinner(currentWinner);
+      const winnerId = await roomStore.getWinner(code);
+      setWinner(winnerId);
+      if (winnerId) {
+        const winnerPlayer = room.players.find(p => p.id === winnerId);
+        setWinnerName(winnerPlayer?.name || null);
+      }
 
       if (room.player_picks) {
         setPlayerPicks(room.player_picks);
       }
+
+      // Create a mapping of user IDs to display names
+      const nameMap = room.players.reduce((acc, player) => {
+        acc[player.id] = player.name;
+        return acc;
+      }, {} as { [key: string]: string });
+      setPlayerNames(nameMap);
     };
 
     loadGameState();
@@ -73,25 +112,34 @@ export default function GameBoard({ params }: GameBoardProps) {
       // Update winner if game is over
       if (room.winner) {
         setWinner(room.winner);
+        const winnerPlayer = room.players.find(p => p.id === room.winner);
+        setWinnerName(winnerPlayer?.name || null);
       }
 
       // Update guess count
-      const count = await roomStore.getGuessCount(code, storedNickname);
+      const count = await roomStore.getGuessCount(code, userId);
       setGuessCount(count);
 
       // Update player picks
       if (room.player_picks) {
         setPlayerPicks(room.player_picks);
       }
+
+      // Update player names mapping
+      const nameMap = room.players.reduce((acc, player) => {
+        acc[player.id] = player.name;
+        return acc;
+      }, {} as { [key: string]: string });
+      setPlayerNames(nameMap);
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [code, router]);
+  }, [code, router, session?.user?.user_metadata?.username, userId]);
 
   const handleCardClick = async (characterId: string) => {
-    if (winner) return; // Game is over
+    if (winner || !userId) return; // Game is over or no user ID
 
     if (isGuessing) {
       // Make a guess
@@ -100,7 +148,7 @@ export default function GameBoard({ params }: GameBoardProps) {
         return;
       }
 
-      const success = await roomStore.makeGuess(code, nickname, characterId);
+      const success = await roomStore.makeGuess(code, userId, characterId);
       if (success) {
         setGuessCount(prev => prev + 1);
       }
@@ -115,8 +163,8 @@ export default function GameBoard({ params }: GameBoardProps) {
   };
 
   const getStatusMessage = () => {
-    if (winner) {
-      return winner === nickname ? 'You won! 🎉' : `${winner} won!`;
+    if (winnerName) {
+      return winner === userId ? 'You won! 🎉' : `${winnerName} won!`;
     }
     if (isGuessing) {
       return 'Make your guess!';
@@ -125,6 +173,7 @@ export default function GameBoard({ params }: GameBoardProps) {
   };
 
   const handleExit = async () => {
+    if (!userId) return;
     // Only show confirmation if game is in progress (no winner)
     if (
       !winner &&
@@ -132,11 +181,11 @@ export default function GameBoard({ params }: GameBoardProps) {
     ) {
       return;
     }
-    await roomStore.leaveRoom(code, nickname);
+    await roomStore.leaveRoom(code, userId);
     router.replace('/');
   };
 
-  if (!nickname) {
+  if (!userId || !nickname) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center p-24">
         <div className="text-center">
@@ -146,9 +195,10 @@ export default function GameBoard({ params }: GameBoardProps) {
     );
   }
 
-  const myPick = playerPicks[nickname];
+  const myPick = playerPicks[userId];
   const myCharacter = poolCharacters.find(c => c.id === myPick);
-  const opponentNickname = Object.keys(playerPicks).find(n => n !== nickname);
+  const opponentId = Object.keys(playerPicks).find(id => id !== userId);
+  const opponentName = opponentId ? playerNames[opponentId] : null;
 
   return (
     <main className="flex min-h-screen flex-col items-center p-8">
@@ -204,9 +254,9 @@ export default function GameBoard({ params }: GameBoardProps) {
           {/* Opponent Info */}
           <div className="bg-white/10 rounded-lg p-6">
             <h2 className="text-xl font-bold mb-4">
-              {opponentNickname ? `${opponentNickname}'s Character` : 'Waiting for opponent...'}
+              {opponentName ? `${opponentName}'s Character` : 'Waiting for opponent...'}
             </h2>
-            {opponentNickname && (
+            {opponentName && (
               <div className="flex items-center justify-center">
                 <div className="w-24 h-24 bg-white/5 rounded-lg flex items-center justify-center">
                   <span className="text-6xl">❓</span>

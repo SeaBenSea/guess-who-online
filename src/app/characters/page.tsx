@@ -6,15 +6,47 @@ import { characterStore } from '@/utils/characterStore';
 import AddCharacterModal from '@/components/AddCharacterModal';
 import Image from 'next/image';
 import Navbar from '@/components/Navbar';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useRouter } from 'next/navigation';
+import { Session } from '@supabase/supabase-js';
 
 export default function CharactersPage() {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [session, setSession] = useState<Session | null>(null);
+  const supabase = createClientComponentClient();
+  const router = useRouter();
 
   useEffect(() => {
-    loadCharacters();
-  }, []);
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (!session) {
+        router.replace('/');
+        return;
+      }
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (!session) {
+        router.replace('/');
+        return;
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase.auth, router]);
+
+  useEffect(() => {
+    if (session) {
+      loadCharacters();
+    }
+  }, [session]);
 
   const loadCharacters = async () => {
     setIsLoading(true);
@@ -23,14 +55,30 @@ export default function CharactersPage() {
     setIsLoading(false);
   };
 
-  const handleAddCharacter = async (newCharacter: NewCharacter) => {
-    const character = await characterStore.addCharacter(newCharacter);
-    if (character) {
+  const handleAddCharacter = async (newCharacter: Omit<NewCharacter, 'createdBy'>) => {
+    if (!session?.user?.id) return;
+    
+    const result = await characterStore.addCharacter({
+      ...newCharacter,
+      createdBy: session.user.id,
+    });
+    
+    if (result.error) {
+      alert(result.error);
+    } else if (result.character) {
       setCharacters(characterStore.getCharacters());
     }
   };
 
-  const handleDeleteCharacter = async (id: string) => {
+  const handleDeleteCharacter = async (id: string, createdBy: string) => {
+    if (!session?.user?.id) return;
+    
+    // Only allow deletion if the user created the character
+    if (createdBy !== session.user.id) {
+      alert('You can only delete characters that you created.');
+      return;
+    }
+
     if (window.confirm('Are you sure you want to delete this character?')) {
       const success = await characterStore.deleteCharacter(id);
       if (success) {
@@ -39,17 +87,33 @@ export default function CharactersPage() {
     }
   };
 
+  if (!session) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center p-24">
+        <div className="text-center">
+          <p className="text-lg">Please sign in to manage characters.</p>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="flex min-h-screen flex-col">
       <Navbar />
       <div className="flex min-h-screen flex-col items-center p-24">
         <div className="z-10 max-w-5xl w-full items-center justify-center font-mono text-sm">
           <div className="flex justify-between items-center mb-8">
-            <h1 className="text-4xl font-bold">Manage Characters</h1>
+            <div>
+              <h1 className="text-4xl font-bold">Manage Characters</h1>
+              <p className="text-sm text-gray-400 mt-2">
+                {characters.length}/20 characters created
+              </p>
+            </div>
             <div className="flex gap-4">
               <button
                 onClick={() => setIsAddModalOpen(true)}
-                className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                disabled={characters.length >= 20}
+                className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Add Character
               </button>
@@ -93,12 +157,14 @@ export default function CharactersPage() {
                       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
                       .join(' ')}
                   </p>
-                  <button
-                    onClick={() => handleDeleteCharacter(character.id)}
-                    className="text-red-500 hover:text-red-600 text-sm"
-                  >
-                    Delete
-                  </button>
+                  {character.createdBy === session.user.id && (
+                    <button
+                      onClick={() => handleDeleteCharacter(character.id, character.createdBy)}
+                      className="text-red-500 hover:text-red-600 text-sm"
+                    >
+                      Delete
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

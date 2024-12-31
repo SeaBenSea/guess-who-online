@@ -39,10 +39,12 @@ export interface Character {
   type: CharacterType;
   imageUrl?: string;
   createdAt: number;
+  createdBy: string;
 }
 
 export interface NewCharacter {
   name: string;
   type: CharacterType;
   imageUrl?: string;
+  createdBy: string;
 }

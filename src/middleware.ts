@@ -1,47 +1,57 @@
+import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export function middleware(request: NextRequest) {
+const PUBLIC_ROUTES = ['/', '/auth/signin', '/auth/signup', '/auth/verify-email'];
+const PUBLIC_API_ROUTES = ['/api/auth/check-availability'];
+
+export async function middleware(request: NextRequest) {
+  const res = NextResponse.next();
+  const supabase = createMiddlewareClient({ req: request, res });
   const { pathname } = request.nextUrl;
-  const storedNickname = request.cookies.get('playerNickname')?.value;
-  const host = request.headers.get('host') || '';
-  const referer = request.headers.get('referer');
 
-  // Protected routes that require a nickname
-  if (pathname.startsWith('/room/') || pathname.startsWith('/game/')) {
-    // First check if user has a nickname
-    if (!storedNickname) {
-      return NextResponse.redirect(new URL('/', request.url));
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  // API route protection
+  if (pathname.startsWith('/api/')) {
+    // Allow public API routes
+    if (PUBLIC_API_ROUTES.includes(pathname)) {
+      return res;
     }
 
-    // Then check if they came from our app
-    if (!referer || !referer.includes(host)) {
-      // For /game routes, also allow navigation from room pages
-      if (pathname.startsWith('/game/') && referer?.includes(`${host}/room/`)) {
-        return NextResponse.next();
-      }
-      return NextResponse.redirect(new URL('/', request.url));
+    // Check for authenticated session for protected API routes
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
     }
+
+    return res;
   }
 
-  // Admin page protection (only for admin features, not the login page)
-  if (pathname.startsWith('/admin/')) {
-    const isAuth = request.cookies.get('adminPageAuth')?.value === 'true';
-    if (!isAuth) {
-      return NextResponse.redirect(new URL('/', request.url));
-    }
+  // Page route protection
+  if (!session && !PUBLIC_ROUTES.includes(pathname)) {
+    return NextResponse.redirect(new URL('/auth/signin', request.url));
   }
 
-  // Characters page protection (only accessible from home)
-  if (pathname === '/characters') {
-    if (!referer || !referer.includes(host)) {
-      return NextResponse.redirect(new URL('/', request.url));
-    }
+  if (session && pathname.includes('/auth')) {
+    return NextResponse.redirect(new URL('/', request.url));
   }
 
-  return NextResponse.next();
+  return res;
 }
 
 export const config = {
-  matcher: ['/room/:path*', '/game/:path*', '/admin/:path*', '/characters'],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    '/((?!_next/static|_next/image|favicon.ico).*)',
+  ],
 };

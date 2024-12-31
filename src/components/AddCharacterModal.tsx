@@ -6,7 +6,7 @@ import { CharacterType, NewCharacter } from '@/types/character';
 interface AddCharacterModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (character: NewCharacter) => void;
+  onSubmit: (character: Omit<NewCharacter, 'createdBy'>) => void;
 }
 
 const CHARACTER_TYPE_LABELS: Record<CharacterType, string> = {

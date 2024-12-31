@@ -9,10 +9,12 @@ import { characterStore } from '@/utils/characterStore';
 import { Character, CHARACTER_EMOJIS, CharacterType } from '@/types/character';
 import { PoolCharacter } from '@/types/poolCharacter';
 import CharacterPickModal from '@/components/CharacterPickModal';
-import Cookies from 'js-cookie';
 import Image from 'next/image';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { Session } from '@supabase/supabase-js';
 
 interface PlayerState {
+  id: string;
   name: string;
 }
 
@@ -23,7 +25,8 @@ interface GameRoomProps {
 }
 
 interface PlayerPickState {
-  nickname: string;
+  id: string;
+  name: string;
   characterId?: string;
   isReady: boolean;
 }
@@ -35,6 +38,7 @@ export default function GameRoom({ params }: GameRoomProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [nickname, setNickname] = useState<string>('');
+  const [userId, setUserId] = useState<string>('');
   const [copied, setCopied] = useState(false);
   const [showCharacterPool, setShowCharacterPool] = useState(false);
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -43,6 +47,36 @@ export default function GameRoom({ params }: GameRoomProps) {
   const isUnmounting = useRef(false);
   const [showPickModal, setShowPickModal] = useState(false);
   const [playerPicks, setPlayerPicks] = useState<PlayerPickState[]>([]);
+  const [session, setSession] = useState<Session | null>(null);
+  const supabase = createClientComponentClient();
+
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (!session?.user?.user_metadata?.username) {
+        router.replace('/');
+        return;
+      }
+      setNickname(session.user.user_metadata.username);
+      setUserId(session.user.id);
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (!session?.user?.user_metadata?.username) {
+        router.replace('/');
+        return;
+      }
+      setNickname(session.user.user_metadata.username);
+      setUserId(session.user.id);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [router, supabase.auth]);
 
   useEffect(() => {
     const loadCharacters = async () => {
@@ -70,13 +104,7 @@ export default function GameRoom({ params }: GameRoomProps) {
   }, [code]);
 
   useEffect(() => {
-    // Get the stored nickname
-    const storedNickname = Cookies.get('playerNickname');
-    if (!storedNickname) {
-      router.replace('/');
-      return;
-    }
-    setNickname(storedNickname);
+    if (!session?.user?.user_metadata?.username) return;
 
     let subscription: RealtimeChannel;
 
@@ -103,7 +131,8 @@ export default function GameRoom({ params }: GameRoomProps) {
             setShowPickModal(true);
             setPlayerPicks(
               room.players.map(p => ({
-                nickname: p.name,
+                id: p.id,
+                name: p.name,
                 characterId: undefined,
                 isReady: false,
               }))
@@ -111,11 +140,11 @@ export default function GameRoom({ params }: GameRoomProps) {
           }
 
           // Check if we're already in the room
-          hasJoined.current = room.players?.some(p => p.name === storedNickname) || false;
+          hasJoined.current = room.players?.some(p => p.id === userId) || false;
 
           // If not in room, join
           if (!hasJoined.current) {
-            const joined = await roomStore.joinRoom(code, storedNickname);
+            const joined = await roomStore.joinRoom(code, userId, nickname);
             if (joined) {
               hasJoined.current = true;
             } else {
@@ -141,7 +170,8 @@ export default function GameRoom({ params }: GameRoomProps) {
               setShowPickModal(true);
               setPlayerPicks(
                 updatedRoom.players.map(p => ({
-                  nickname: p.name,
+                  id: p.id,
+                  name: p.name,
                   characterId: undefined,
                   isReady: false,
                 }))
@@ -152,22 +182,23 @@ export default function GameRoom({ params }: GameRoomProps) {
             if (updatedRoom.player_picks_state) {
               setPlayerPicks(
                 updatedRoom.players.map(p => ({
-                  nickname: p.name,
-                  characterId: updatedRoom.player_picks?.[p.name],
-                  isReady: updatedRoom.player_picks_state?.[p.name]?.isReady || false,
+                  id: p.id,
+                  name: p.name,
+                  characterId: updatedRoom.player_picks?.[p.id],
+                  isReady: updatedRoom.player_picks_state?.[p.id]?.isReady || false,
                 }))
               );
             }
           }
 
           // If we're not in the players list anymore, redirect to home
-          if (!updatedRoom.players?.some(p => p.name === storedNickname)) {
+          if (!updatedRoom.players?.some(p => p.id === userId)) {
             router.replace('/');
           }
         });
-      } catch (err) {
-        setError('Failed to load room');
-        console.error('Room initialization error:', err);
+      } catch (error) {
+        console.error('[GameRoom] Error initializing room:', error);
+        setError('Failed to initialize room');
       } finally {
         setIsLoading(false);
       }
@@ -176,14 +207,16 @@ export default function GameRoom({ params }: GameRoomProps) {
     initializeRoom();
 
     return () => {
-      subscription?.unsubscribe();
+      if (subscription) {
+        subscription.unsubscribe();
+      }
     };
-  }, [code, router, showPickModal]);
+  }, [code, router, showPickModal, session?.user?.user_metadata?.username, userId]);
 
   const handleExit = async () => {
-    if (nickname && hasJoined.current) {
+    if (userId && hasJoined.current) {
       isUnmounting.current = true;
-      await roomStore.leaveRoom(code, nickname);
+      await roomStore.leaveRoom(code, userId);
       hasJoined.current = false;
     }
     router.push('/');
@@ -228,7 +261,8 @@ export default function GameRoom({ params }: GameRoomProps) {
         setShowPickModal(true);
         setPlayerPicks(
           room.players.map(p => ({
-            nickname: p.name,
+            id: p.id,
+            name: p.name,
             characterId: undefined,
             isReady: false,
           }))
@@ -236,7 +270,7 @@ export default function GameRoom({ params }: GameRoomProps) {
       }
 
       // If we're not in the players list anymore, redirect to home
-      if (!room.players?.some(p => p.name === nickname)) {
+      if (!room.players?.some(p => p.id === userId)) {
         router.replace('/');
       }
     });
@@ -247,13 +281,15 @@ export default function GameRoom({ params }: GameRoomProps) {
   }, [code, router, nickname, showPickModal]);
 
   const handleCharacterPick = async (characterId: string) => {
-    await roomStore.pickCharacter(code, nickname, characterId, false);
+    if (!userId) return;
+    await roomStore.pickCharacter(code, userId, characterId, false);
   };
 
   const handleReady = async () => {
-    const myPick = playerPicks.find(p => p.nickname === nickname);
+    if (!userId) return;
+    const myPick = playerPicks.find(p => p.id === userId);
     if (myPick?.characterId) {
-      await roomStore.pickCharacter(code, nickname, myPick.characterId, true);
+      await roomStore.pickCharacter(code, userId, myPick.characterId, true);
     }
   };
 
@@ -308,12 +344,12 @@ export default function GameRoom({ params }: GameRoomProps) {
               <div className="space-y-4">
                 {players.map(player => (
                   <div
-                    key={player.name}
+                    key={player.id}
                     className="flex items-center justify-between p-4 rounded-lg bg-white/5"
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-lg">
-                        {player.name} {player.name === nickname && '(You)'}
+                        {player.name} {player.id === userId && '(You)'}
                       </span>
                     </div>
                   </div>
@@ -485,6 +521,7 @@ export default function GameRoom({ params }: GameRoomProps) {
         poolCharacters={poolCharacters}
         onPick={handleCharacterPick}
         onReady={handleReady}
+        playerId={userId}
         playerName={nickname}
         players={playerPicks}
       />
