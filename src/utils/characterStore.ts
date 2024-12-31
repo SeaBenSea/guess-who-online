@@ -71,7 +71,10 @@ class CharacterStore {
     return { character };
   }
 
-  getCharacters(): Character[] {
+  getCharacters(userId?: string): Character[] {
+    if (userId) {
+      return this.characters.filter(char => char.createdBy === userId);
+    }
     return this.characters;
   }
 
