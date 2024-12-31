@@ -29,12 +29,31 @@ export async function middleware(request: NextRequest) {
       );
     }
 
+    // For admin routes, check admin status
+    if (pathname.startsWith('/api/admin/')) {
+      const isAdmin = session.user.user_metadata?.is_admin === true;
+      if (!isAdmin) {
+        return NextResponse.json(
+          { error: 'Unauthorized - Admin access required' },
+          { status: 403 }
+        );
+      }
+    }
+
     return res;
   }
 
   // Page route protection
   if (!session && !PUBLIC_ROUTES.includes(pathname)) {
     return NextResponse.redirect(new URL('/auth/signin', request.url));
+  }
+
+  // Admin page protection
+  if (pathname.startsWith('/admin')) {
+    const isAdmin = session?.user?.user_metadata?.is_admin === true;
+    if (!isAdmin) {
+      return NextResponse.redirect(new URL('/', request.url));
+    }
   }
 
   if (session && pathname.includes('/auth')) {
