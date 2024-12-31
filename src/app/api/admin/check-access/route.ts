@@ -21,9 +21,10 @@ export async function GET() {
     }
 
     // Get user with service role to ensure we have the latest metadata
-    const { data: { user }, error: userError } = await supabase.auth.admin.getUserById(
-      session.user.id
-    );
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.admin.getUserById(session.user.id);
 
     if (userError || !user) {
       return NextResponse.json({ error: 'Failed to verify access' }, { status: 500 });
@@ -36,17 +37,17 @@ export async function GET() {
     }
 
     // Return user data for client-side use
-    return NextResponse.json({ 
+    return NextResponse.json({
       access: true,
       user: {
         id: user.id,
         email: user.email,
         metadata: user.user_metadata,
-        lastVerified: new Date().toISOString()
-      }
+        lastVerified: new Date().toISOString(),
+      },
     });
   } catch (error) {
     console.error('Error checking admin access:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-} 
+}

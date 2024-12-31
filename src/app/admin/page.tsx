@@ -335,7 +335,11 @@ export default function AdminPage() {
   }, [isAuthenticated, activeTab]);
 
   const handleRoleUpdate = async (userId: string, isAdmin: boolean) => {
-    if (!window.confirm(`Are you sure you want to ${isAdmin ? 'grant' : 'revoke'} admin access for this user?`)) {
+    if (
+      !window.confirm(
+        `Are you sure you want to ${isAdmin ? 'grant' : 'revoke'} admin access for this user?`
+      )
+    ) {
       return;
     }
 
@@ -396,7 +400,11 @@ export default function AdminPage() {
   };
 
   const handleDeleteCharacter = async (characterId: string) => {
-    if (!window.confirm('Are you sure you want to delete this character? This action cannot be undone.')) {
+    if (
+      !window.confirm(
+        'Are you sure you want to delete this character? This action cannot be undone.'
+      )
+    ) {
       return;
     }
 
@@ -444,7 +452,9 @@ export default function AdminPage() {
       <main className="flex min-h-screen flex-col items-center justify-center p-24">
         <div className="w-full max-w-md bg-white/5 p-8 rounded-lg shadow-lg">
           <h1 className="text-2xl font-bold text-center mb-6">Admin Panel</h1>
-          <p className="text-center text-red-500">Access denied. You need admin privileges to view this page.</p>
+          <p className="text-center text-red-500">
+            Access denied. You need admin privileges to view this page.
+          </p>
         </div>
       </main>
     );
@@ -460,7 +470,8 @@ export default function AdminPage() {
               <h1 className="text-2xl font-bold">Admin Panel</h1>
               {adminUser && (
                 <p className="text-sm text-gray-400">
-                  Logged in as {adminUser.email} | Last verified: {new Date(adminUser.lastVerified).toLocaleTimeString()}
+                  Logged in as {adminUser.email} | Last verified:{' '}
+                  {new Date(adminUser.lastVerified).toLocaleTimeString()}
                 </p>
               )}
             </div>
@@ -475,19 +486,21 @@ export default function AdminPage() {
           {/* Navigation Tabs */}
           <div className="border-b border-gray-600">
             <nav className="flex gap-4">
-              {(['overview', 'rooms', 'characters', 'users', 'tests', 'system'] as AdminTab[]).map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-                    activeTab === tab
-                      ? 'border-blue-500 text-blue-500'
-                      : 'border-transparent hover:border-gray-400'
-                  }`}
-                >
-                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                </button>
-              ))}
+              {(['overview', 'rooms', 'characters', 'users', 'tests', 'system'] as AdminTab[]).map(
+                tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
+                      activeTab === tab
+                        ? 'border-blue-500 text-blue-500'
+                        : 'border-transparent hover:border-gray-400'
+                    }`}
+                  >
+                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  </button>
+                )
+              )}
             </nav>
           </div>
 
@@ -642,11 +655,14 @@ export default function AdminPage() {
                       </thead>
                       <tbody>
                         {characters
-                          .filter(char => 
+                          .filter(char =>
                             char.name.toLowerCase().includes(searchQuery.toLowerCase())
                           )
                           .map(character => (
-                            <tr key={character.id} className="border-b border-gray-700/50 hover:bg-white/5">
+                            <tr
+                              key={character.id}
+                              className="border-b border-gray-700/50 hover:bg-white/5"
+                            >
                               <td className="p-3">{character.name}</td>
                               <td className="p-3">
                                 <span className="flex items-center gap-2">
@@ -660,9 +676,12 @@ export default function AdminPage() {
                                 </span>
                               </td>
                               <td className="p-3">
-                                {users.find(u => u.id === character.createdBy)?.email || character.createdBy}
+                                {users.find(u => u.id === character.createdBy)?.email ||
+                                  character.createdBy}
                               </td>
-                              <td className="p-3">{new Date(character.createdAt).toLocaleDateString()}</td>
+                              <td className="p-3">
+                                {new Date(character.createdAt).toLocaleDateString()}
+                              </td>
                               <td className="p-3">
                                 <button
                                   onClick={() => handleDeleteCharacter(character.id)}
@@ -861,7 +880,9 @@ export default function AdminPage() {
                           <td className="p-3">{new Date(user.created_at).toLocaleDateString()}</td>
                           <td className="p-3">
                             <button
-                              onClick={() => handleRoleUpdate(user.id, !user.user_metadata?.is_admin)}
+                              onClick={() =>
+                                handleRoleUpdate(user.id, !user.user_metadata?.is_admin)
+                              }
                               disabled={isUpdatingRole || user.id === adminUser?.id}
                               className={`px-2 py-1 text-xs rounded ${
                                 user.user_metadata?.is_admin

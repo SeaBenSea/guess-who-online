@@ -48,18 +48,18 @@ export default function Home() {
 
       const created = await roomStore.createRoom(roomCode);
       console.log('[Home] Room creation result:', created);
-      
+
       if (!created) {
         throw new Error('Failed to create room');
       }
 
       const joined = await roomStore.joinRoom(
-        roomCode, 
+        roomCode,
         session.user.id,
         session.user.user_metadata.username
       );
       console.log('[Home] Room join result:', joined);
-      
+
       if (!joined) {
         throw new Error('Failed to join room');
       }
@@ -89,9 +89,7 @@ export default function Home() {
 
         {!session ? (
           <div className="flex flex-col items-center gap-4 mb-8">
-            <p className="text-lg text-center text-gray-600 mb-4">
-              Sign in to start playing!
-            </p>
+            <p className="text-lg text-center text-gray-600 mb-4">Sign in to start playing!</p>
             <div className="flex justify-center gap-4">
               <Link
                 href="/auth/signin"

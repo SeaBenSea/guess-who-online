@@ -30,9 +30,11 @@ class CharacterStore {
     return this.characters.filter(char => char.createdBy === userId).length;
   }
 
-  async addCharacter(newCharacter: NewCharacter): Promise<{ character: Character | null; error?: string }> {
+  async addCharacter(
+    newCharacter: NewCharacter
+  ): Promise<{ character: Character | null; error?: string }> {
     const userCharacterCount = this.getCharacterCountForUser(newCharacter.createdBy);
-    
+
     if (userCharacterCount >= 20) {
       return { character: null, error: 'You have reached the maximum limit of 20 characters.' };
     }

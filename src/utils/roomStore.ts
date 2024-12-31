@@ -4,7 +4,7 @@ import { Character } from '@/types/character';
 import { PoolCharacter } from '@/types/poolCharacter';
 
 interface PlayerState {
-  id: string;  // user ID
+  id: string; // user ID
   name: string; // display name (nickname)
   isReady?: boolean;
 }
@@ -107,9 +107,7 @@ class RoomStore {
     }
 
     // Check if user is already in this room
-    const isUserInRoom = data.players.some(
-      (p: PlayerState) => p.id === userId
-    );
+    const isUserInRoom = data.players.some((p: PlayerState) => p.id === userId);
 
     if (isUserInRoom) {
       this.debug('canJoinRoom:userAlreadyInRoom', { code, userId, currentPlayers: data.players });
@@ -455,7 +453,10 @@ class RoomStore {
       await this.supabase.from('rooms').delete().eq('id', testCode);
 
       // check if the room was deleted
-      const { data: deletedRoom } = await this.supabase.from('rooms').select('id').eq('id', testCode);
+      const { data: deletedRoom } = await this.supabase
+        .from('rooms')
+        .select('id')
+        .eq('id', testCode);
       console.log(deletedRoom); // Should confirm if a row exists.
 
       return {
@@ -555,7 +556,10 @@ class RoomStore {
 
   async startGame(code: string): Promise<boolean> {
     this.debug('startGame', { code });
-    const { error } = await this.supabase.from('rooms').update({ is_game_started: true }).eq('id', code);
+    const { error } = await this.supabase
+      .from('rooms')
+      .update({ is_game_started: true })
+      .eq('id', code);
 
     if (error) {
       this.debug('startGame:error', error);
@@ -625,7 +629,8 @@ class RoomStore {
       .select('players')
       .eq('id', winnerId)
       .single();
-    const winnerName = winnerRoom?.players?.find((p: PlayerState) => p.id === winnerId)?.name || 'Unknown';
+    const winnerName =
+      winnerRoom?.players?.find((p: PlayerState) => p.id === winnerId)?.name || 'Unknown';
 
     // Get loser's display name
     const { data: loserRoom } = await this.supabase
@@ -633,7 +638,8 @@ class RoomStore {
       .select('players')
       .eq('id', loserId)
       .single();
-    const loserName = loserRoom?.players?.find((p: PlayerState) => p.id === loserId)?.name || 'Unknown';
+    const loserName =
+      loserRoom?.players?.find((p: PlayerState) => p.id === loserId)?.name || 'Unknown';
 
     try {
       const response = await fetch('/api/leaderboard/update', {
@@ -774,4 +780,3 @@ class RoomStore {
 }
 
 export const roomStore = new RoomStore();
-

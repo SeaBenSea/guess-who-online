@@ -24,7 +24,7 @@ export async function POST(request: Request) {
 
     // Delete the character using a function that bypasses RLS
     const { error } = await supabase.rpc('admin_delete_character', {
-      character_id: characterId
+      character_id: characterId,
     });
 
     if (error) {
@@ -37,4 +37,4 @@ export async function POST(request: Request) {
     console.error('Error in character deletion:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-} 
+}

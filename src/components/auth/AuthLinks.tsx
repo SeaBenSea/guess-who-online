@@ -26,4 +26,4 @@ export default function AuthLinks({ type }: AuthLinksProps) {
       </Link>
     </p>
   );
-} 
+}

@@ -8,10 +8,7 @@ export async function POST(request: Request) {
 
     // Validate input
     if (!winnerId || !loserId) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
     // Get supabase client with service role
@@ -32,18 +29,12 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error('Error updating leaderboard:', error);
-      return NextResponse.json(
-        { error: 'Failed to update leaderboard' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to update leaderboard' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error in leaderboard update:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-} 
+}

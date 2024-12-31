@@ -77,7 +77,9 @@ export default function LeaderboardPage() {
                           {index + 1}
                         </span>
                       </td>
-                      <td className="px-6 py-4 font-semibold text-gray-900">{entry.user_metadata?.username || 'Unknown Player'}</td>
+                      <td className="px-6 py-4 font-semibold text-gray-900">
+                        {entry.user_metadata?.username || 'Unknown Player'}
+                      </td>
                       <td className="px-6 py-4 text-gray-600">{entry.games_played}</td>
                       <td className="px-6 py-4">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-green-100 text-green-800">

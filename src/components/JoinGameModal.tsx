@@ -11,7 +11,12 @@ interface JoinGameModalProps {
   displayName: string | null;
 }
 
-export default function JoinGameModal({ isOpen, onClose, userId, displayName }: JoinGameModalProps) {
+export default function JoinGameModal({
+  isOpen,
+  onClose,
+  userId,
+  displayName,
+}: JoinGameModalProps) {
   const router = useRouter();
   const [roomCode, setRoomCode] = useState('');
   const [error, setError] = useState('');
@@ -30,7 +35,7 @@ export default function JoinGameModal({ isOpen, onClose, userId, displayName }: 
 
       const exists = await roomStore.roomExists(code);
       console.log('[JoinModal] Room exists:', exists);
-      
+
       if (!exists) {
         setError('Room does not exist');
         return;
@@ -38,7 +43,7 @@ export default function JoinGameModal({ isOpen, onClose, userId, displayName }: 
 
       const { canJoin, reason } = await roomStore.canJoinRoom(code, userId, displayName);
       console.log('[JoinModal] Can join room:', canJoin, 'Reason:', reason);
-      
+
       if (!canJoin) {
         setError(reason || 'Cannot join room');
         return;

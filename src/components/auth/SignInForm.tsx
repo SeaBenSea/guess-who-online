@@ -13,7 +13,7 @@ export default function SignInForm() {
     email: '',
     password: '',
   });
-  
+
   const supabase = createClientComponentClient();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -53,11 +53,7 @@ export default function SignInForm() {
 
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-md space-y-4">
-      {error && (
-        <div className="p-3 text-sm text-red-500 bg-red-100 rounded-lg">
-          {error}
-        </div>
-      )}
+      {error && <div className="p-3 text-sm text-red-500 bg-red-100 rounded-lg">{error}</div>}
 
       <div>
         <label htmlFor="email" className="block text-sm font-medium text-gray-700">
@@ -98,4 +94,4 @@ export default function SignInForm() {
       </button>
     </form>
   );
-} 
+}

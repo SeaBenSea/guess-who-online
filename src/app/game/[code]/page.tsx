@@ -93,10 +93,13 @@ export default function GameBoard({ params }: GameBoardProps) {
       }
 
       // Create a mapping of user IDs to display names
-      const nameMap = room.players.reduce((acc, player) => {
-        acc[player.id] = player.name;
-        return acc;
-      }, {} as { [key: string]: string });
+      const nameMap = room.players.reduce(
+        (acc, player) => {
+          acc[player.id] = player.name;
+          return acc;
+        },
+        {} as { [key: string]: string }
+      );
       setPlayerNames(nameMap);
     };
 
@@ -126,10 +129,13 @@ export default function GameBoard({ params }: GameBoardProps) {
       }
 
       // Update player names mapping
-      const nameMap = room.players.reduce((acc, player) => {
-        acc[player.id] = player.name;
-        return acc;
-      }, {} as { [key: string]: string });
+      const nameMap = room.players.reduce(
+        (acc, player) => {
+          acc[player.id] = player.name;
+          return acc;
+        },
+        {} as { [key: string]: string }
+      );
       setPlayerNames(nameMap);
     });
 

@@ -71,12 +71,12 @@ export default function CharactersPage() {
 
   const handleAddCharacter = async (newCharacter: Omit<NewCharacter, 'createdBy'>) => {
     if (!session?.user?.id) return;
-    
+
     const result = await characterStore.addCharacter({
       ...newCharacter,
       createdBy: session.user.id,
     });
-    
+
     if (result.error) {
       alert(result.error);
     } else if (result.character) {
@@ -86,7 +86,7 @@ export default function CharactersPage() {
 
   const handleDeleteCharacter = async (id: string, createdBy: string) => {
     if (!session?.user?.id) return;
-    
+
     // Only allow deletion if the user created the character
     if (createdBy !== session.user.id) {
       alert('You can only delete characters that you created.');
@@ -120,7 +120,8 @@ export default function CharactersPage() {
             <div>
               <h1 className="text-4xl font-bold">Manage Characters</h1>
               <p className="text-sm text-gray-400 mt-2">
-                {characterStore.getCharacterCountForUser(session.user.id)}/20 characters created by you
+                {characterStore.getCharacterCountForUser(session.user.id)}/20 characters created by
+                you
               </p>
             </div>
             <div className="flex gap-4">
@@ -141,20 +142,22 @@ export default function CharactersPage() {
                 type="text"
                 placeholder="Search by name..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={e => setSearchQuery(e.target.value)}
                 className="flex-1 px-4 py-2 bg-white/5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <select
                 value={selectedType}
-                onChange={(e) => setSelectedType(e.target.value)}
+                onChange={e => setSelectedType(e.target.value)}
                 className="px-4 py-2 bg-white/5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {characterTypes.map(type => (
                   <option key={type} value={type}>
-                    {type === 'all' 
+                    {type === 'all'
                       ? 'All Types'
-                      : type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
-                    }
+                      : type
+                          .split('_')
+                          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                          .join(' ')}
                   </option>
                 ))}
               </select>
@@ -164,7 +167,7 @@ export default function CharactersPage() {
                 <input
                   type="checkbox"
                   checked={showOnlyMyCharacters}
-                  onChange={(e) => setShowOnlyMyCharacters(e.target.checked)}
+                  onChange={e => setShowOnlyMyCharacters(e.target.checked)}
                   className="sr-only peer"
                 />
                 <div className="w-11 h-6 bg-white/5 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
@@ -178,16 +181,14 @@ export default function CharactersPage() {
           ) : filteredCharacters.length === 0 ? (
             <div className="bg-white/5 p-6 rounded-lg shadow-lg text-center">
               <p className="text-lg mb-4">
-                {characters.length === 0 
-                  ? "No characters added yet."
-                  : "No characters match your search criteria."
-                }
+                {characters.length === 0
+                  ? 'No characters added yet.'
+                  : 'No characters match your search criteria.'}
               </p>
               <p className="text-gray-400">
-                {characters.length === 0 
+                {characters.length === 0
                   ? 'Click the "Add Character" button to create your first character!'
-                  : "Try adjusting your filters to see more characters."
-                }
+                  : 'Try adjusting your filters to see more characters.'}
               </p>
             </div>
           ) : (

@@ -38,7 +38,7 @@ export default function SignUpForm() {
       });
 
       const availabilityData = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(availabilityData.error);
       }
@@ -58,14 +58,12 @@ export default function SignUpForm() {
 
       if (data) {
         // Create profile entry
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([
-            {
-              id: data.user?.id,
-              username: formData.username,
-            }
-          ]);
+        const { error: profileError } = await supabase.from('profiles').insert([
+          {
+            id: data.user?.id,
+            username: formData.username,
+          },
+        ]);
 
         if (profileError) throw profileError;
 
@@ -91,12 +89,8 @@ export default function SignUpForm() {
 
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-md space-y-4">
-      {error && (
-        <div className="p-3 text-sm text-red-500 bg-red-100 rounded-lg">
-          {error}
-        </div>
-      )}
-      
+      {error && <div className="p-3 text-sm text-red-500 bg-red-100 rounded-lg">{error}</div>}
+
       <div>
         <label htmlFor="email" className="block text-sm font-medium text-gray-700">
           Email
@@ -170,4 +164,4 @@ export default function SignUpForm() {
       </button>
     </form>
   );
-} 
+}

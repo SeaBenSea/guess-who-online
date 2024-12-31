@@ -22,7 +22,10 @@ export async function GET() {
     }
 
     // Get all users
-    const { data: { users }, error } = await supabase.auth.admin.listUsers();
+    const {
+      data: { users },
+      error,
+    } = await supabase.auth.admin.listUsers();
 
     if (error) {
       console.error('Error fetching users:', error);
@@ -34,4 +37,4 @@ export async function GET() {
     console.error('Error in users list:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-} 
+}

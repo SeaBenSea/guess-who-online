@@ -211,7 +211,7 @@ export default function GameRoom({ params }: GameRoomProps) {
         subscription.unsubscribe();
       }
     };
-  }, [code, router, showPickModal, session?.user?.user_metadata?.username, userId]);
+  }, [code, router, nickname, showPickModal, session?.user?.user_metadata?.username, userId]);
 
   const handleExit = async () => {
     if (userId && hasJoined.current) {
@@ -278,7 +278,7 @@ export default function GameRoom({ params }: GameRoomProps) {
     return () => {
       subscription.unsubscribe();
     };
-  }, [code, router, nickname, showPickModal]);
+  }, [code, router, showPickModal, userId]);
 
   const handleCharacterPick = async (characterId: string) => {
     if (!userId) return;

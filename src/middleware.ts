@@ -23,10 +23,7 @@ export async function middleware(request: NextRequest) {
 
     // Check for authenticated session for protected API routes
     if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // For admin routes, check admin status
