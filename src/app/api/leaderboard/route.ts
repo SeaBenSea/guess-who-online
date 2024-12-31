@@ -4,16 +4,15 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const supabase = createRouteHandlerClient(
-      { cookies: () => cookieStore },
-      {
-        supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-        options: {
-          db: { schema: 'public' },
-        },
-      }
-    );
+    const cookieStore = cookies();
+    const supabase = createRouteHandlerClient({ 
+      cookies: () => cookieStore,
+    }, {
+      supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+      options: {
+        db: { schema: 'public' },
+      },
+    });
 
     // Get leaderboard data
     const { data: leaderboardData, error: leaderboardError } = await supabase
