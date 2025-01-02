@@ -1,9 +1,24 @@
 import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import type { SupabaseClient, User } from '@supabase/supabase-js';
 
 const PUBLIC_ROUTES = ['/', '/auth/signin', '/auth/signup', '/auth/verify-email'];
 const PUBLIC_API_ROUTES = ['/api/auth/check-availability'];
+
+// Basic check without service role - final verification happens in API routes
+async function basicAdminCheck(
+  supabase: SupabaseClient,
+  session: { user: User } | null
+) {
+  if (!session) {
+    return false;
+  }
+
+  // Basic check of user metadata
+  // This is just a preliminary check - full verification happens in the API routes
+  return session.user.user_metadata?.is_admin === true;
+}
 
 export async function middleware(request: NextRequest) {
   const res = NextResponse.next();
@@ -26,9 +41,9 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // For admin routes, check admin status
+    // For admin routes, do basic check - full verification happens in the API routes
     if (pathname.startsWith('/api/admin/')) {
-      const isAdmin = session.user.user_metadata?.is_admin === true;
+      const isAdmin = await basicAdminCheck(supabase, session);
       if (!isAdmin) {
         return NextResponse.json(
           { error: 'Unauthorized - Admin access required' },
@@ -45,9 +60,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/auth/signin', request.url));
   }
 
-  // Admin page protection
+  // Admin page protection - basic check, with full verification in the API
   if (pathname.startsWith('/admin')) {
-    const isAdmin = session?.user?.user_metadata?.is_admin === true;
+    const isAdmin = await basicAdminCheck(supabase, session);
     if (!isAdmin) {
       return NextResponse.redirect(new URL('/', request.url));
     }

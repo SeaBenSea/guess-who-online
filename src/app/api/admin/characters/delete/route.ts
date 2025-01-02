@@ -1,26 +1,17 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { verifyAdminAccess } from '@/utils/adminAuth';
 
 export async function POST(request: Request) {
   try {
     const { characterId } = await request.json();
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient(
-      { cookies: () => cookieStore },
-      {
-        supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-      }
-    );
+    
+    const result = await verifyAdminAccess();
 
-    // First check if the requesting user is an admin
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session?.user?.user_metadata?.is_admin) {
-      return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 403 });
+    if ('error' in result) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
     }
+
+    const { supabase } = result;
 
     // Delete the character using a function that bypasses RLS
     const { error } = await supabase.rpc('admin_delete_character', {
