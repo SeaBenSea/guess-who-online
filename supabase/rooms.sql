@@ -23,23 +23,64 @@ ALTER TABLE public.rooms
 ALTER TABLE public.rooms ENABLE ROW LEVEL SECURITY;
 
 -- Create policies
+-- Allow authenticated users to create new rooms
 CREATE POLICY "Enable insert for authenticated users only"
 ON public.rooms
 FOR INSERT
 TO authenticated
 WITH CHECK (true);
 
-CREATE POLICY "Enable update for authenticated users only"
+-- Allow reading rooms that user is part of or public rooms
+CREATE POLICY "Enable read access for room participants and public rooms"
+ON public.rooms
+FOR SELECT
+TO authenticated
+USING (
+    -- Allow if user is in the players array
+    EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements(players) AS player
+        WHERE (player->>'id')::uuid = auth.uid()
+    )
+    -- Or if the room is not started (public)
+    OR NOT is_game_started
+);
+
+-- Allow updates only for players in the room
+CREATE POLICY "Enable update for room participants only"
 ON public.rooms
 FOR UPDATE
 TO authenticated
-USING (true);
+USING (
+    -- Check if user is in the players array
+    EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements(players) AS player
+        WHERE (player->>'id')::uuid = auth.uid()
+    )
+)
+WITH CHECK (
+    -- Check if user is in the players array
+    EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements(players) AS player
+        WHERE (player->>'id')::uuid = auth.uid()
+    )
+);
 
-CREATE POLICY "Enable delete for authenticated users only"
+-- Allow deletion only for players in the room
+CREATE POLICY "Enable delete for room participants only"
 ON public.rooms
 FOR DELETE
 TO authenticated
-USING (true);
+USING (
+    -- Check if user is in the players array
+    EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements(players) AS player
+        WHERE (player->>'id')::uuid = auth.uid()
+    )
+);
 
 -- Enable realtime
 ALTER PUBLICATION supabase_realtime ADD TABLE rooms; 
