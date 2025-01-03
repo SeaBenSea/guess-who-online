@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 
-const PUBLIC_ROUTES = ['/', '/auth/signin', '/auth/signup', '/auth/verify-email'];
+const PUBLIC_ROUTES = ['/', '/auth/signin', '/auth/signup', '/auth/verify-email', '/auth/forgot-password'];
 const PUBLIC_API_ROUTES = ['/api/auth/check-availability'];
 
 // Basic check without service role - final verification happens in API routes

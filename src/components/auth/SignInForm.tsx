@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { AuthError } from '@supabase/supabase-js';
+import Link from 'next/link';
 
 export default function SignInForm() {
   const router = useRouter();
@@ -83,6 +84,14 @@ export default function SignInForm() {
           onChange={handleChange}
           className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
+        <div className="mt-1 text-right">
+          <Link
+            href="/auth/forgot-password"
+            className="text-sm text-purple-600 hover:text-purple-500"
+          >
+            Forgot your password?
+          </Link>
+        </div>
       </div>
 
       <button
