@@ -74,11 +74,7 @@ export default function UpdatePassword() {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="mt-8 space-y-6">
-            {error && (
-              <div className="bg-red-50 text-red-800 p-3 rounded-lg text-sm">
-                {error}
-              </div>
-            )}
+            {error && <div className="bg-red-50 text-red-800 p-3 rounded-lg text-sm">{error}</div>}
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
@@ -96,7 +92,10 @@ export default function UpdatePassword() {
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="confirmPassword"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Confirm New Password
               </label>
               <input
@@ -124,4 +123,4 @@ export default function UpdatePassword() {
       </div>
     </main>
   );
-} 
+}
