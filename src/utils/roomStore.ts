@@ -97,22 +97,28 @@ class RoomStore {
       return { canJoin: false, reason: 'Room not found' };
     }
 
+    // Check if user is already in this room
+    const isUserInRoom = data.players.some((p: PlayerState) => p.id === userId);
+
+    // If game has started, only allow rejoin for existing players
     if (data.is_game_started) {
+      if (isUserInRoom) {
+        this.debug('canJoinRoom:allowRejoin', { code, userId });
+        return { canJoin: true };
+      }
       this.debug('canJoinRoom:gameStarted', { code });
       return { canJoin: false, reason: 'Game has already started' };
     }
 
-    if (data.players.length >= 2) {
+    if (data.players.length >= 2 && !isUserInRoom) {
       this.debug('canJoinRoom:roomFull', { code, currentPlayers: data.players });
       return { canJoin: false, reason: 'Room is full' };
     }
 
-    // Check if user is already in this room
-    const isUserInRoom = data.players.some((p: PlayerState) => p.id === userId);
-
+    // If user is already in room but game hasn't started, allow reconnect
     if (isUserInRoom) {
-      this.debug('canJoinRoom:userAlreadyInRoom', { code, userId, currentPlayers: data.players });
-      return { canJoin: false, reason: 'You are already in this room' };
+      this.debug('canJoinRoom:reconnecting', { code, userId, currentPlayers: data.players });
+      return { canJoin: true };
     }
 
     this.debug('canJoinRoom:success', { code, userId });
@@ -125,7 +131,7 @@ class RoomStore {
     // First, get the current room state
     const { data: room, error: fetchError } = await this.supabase
       .from('rooms')
-      .select('players')
+      .select('players, player_picks, player_picks_state')
       .eq('id', code)
       .single();
 
@@ -141,8 +147,22 @@ class RoomStore {
       return false;
     }
 
-    // Update the room with the new player
-    const updatedPlayers = [...room.players, { id: userId, name: displayName }];
+    // Check if player is already in the room
+    const existingPlayerIndex = room.players.findIndex((p: PlayerState) => p.id === userId);
+    let updatedPlayers: PlayerState[];
+
+    if (existingPlayerIndex !== -1) {
+      // Update existing player's display name if it changed
+      updatedPlayers = [...room.players];
+      updatedPlayers[existingPlayerIndex] = {
+        ...updatedPlayers[existingPlayerIndex],
+        name: displayName,
+      };
+    } else {
+      // Add new player
+      updatedPlayers = [...room.players, { id: userId, name: displayName }];
+    }
+
     this.debug('joinRoom:updating', {
       code,
       userId,
