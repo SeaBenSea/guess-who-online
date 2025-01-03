@@ -12,23 +12,23 @@ export default function ForgotPassword() {
     const [success, setSuccess] = useState(false);
     const supabase = createClientComponentClient();
 
+    const getURL = () => {
+        let url = process?.env?.NEXT_PUBLIC_SITE_URL ?? // If someday we deploy, we can change this to the deployed URL
+            process?.env?.NEXT_PUBLIC_VERCEL_URL ?? // Automatically set by Vercel.
+            'http://localhost:3000/';
+        // Make sure to include `https://` when not localhost.
+        url = url.startsWith('http') ? url : `https://${url}`;
+        // Make sure to include a trailing `/`.
+        url = url.endsWith('/') ? url : `${url}/`;
+        return url;
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
         setIsLoading(true);
 
         try {
-            const getURL = () => {
-                let url =
-                    process?.env?.NEXT_PUBLIC_SITE_URL ?? // Set this to your site URL in production env.
-                    process?.env?.NEXT_PUBLIC_VERCEL_URL ?? // Automatically set by Vercel.
-                    'http://localhost:3000/'
-                // Make sure to include `https://` when not localhost.
-                url = url.startsWith('http') ? url : `https://${url}`
-                // Make sure to include a trailing `/`.
-                url = url.endsWith('/') ? url : `${url}/`
-                return url
-            }
             const { error } = await supabase.auth.resetPasswordForEmail(email, {
                 redirectTo: `${getURL()}auth/update-password`,
             });
