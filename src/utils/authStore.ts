@@ -19,7 +19,9 @@ class AuthStore {
   }
 
   async initialize() {
-    const { data: { session } } = await this.supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await this.supabase.auth.getSession();
     if (session) {
       this.setupTimers(session);
     }
@@ -46,10 +48,10 @@ class AuthStore {
 
   private setupTokenRefreshTimer(session: Session) {
     this.clearTokenRefreshTimer();
-    
+
     const expiresAt = session?.expires_at ?? 0;
     const timeUntilExpiry = (expiresAt - TOKEN_REFRESH_MARGIN) * 1000 - Date.now();
-    
+
     if (timeUntilExpiry > 0) {
       this.tokenRefreshTimer = setTimeout(() => this.refreshToken(), timeUntilExpiry);
     } else {
@@ -89,8 +91,11 @@ class AuthStore {
   }
 
   private async refreshToken() {
-    const { data: { session }, error } = await this.supabase.auth.refreshSession();
-    
+    const {
+      data: { session },
+      error,
+    } = await this.supabase.auth.refreshSession();
+
     if (error) {
       console.error('Failed to refresh token:', error);
       // Force re-authentication on refresh failure
@@ -105,4 +110,4 @@ class AuthStore {
   }
 }
 
-export const authStore = new AuthStore(); 
+export const authStore = new AuthStore();
