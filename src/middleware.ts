@@ -60,7 +60,9 @@ export async function middleware(request: NextRequest) {
 
   // Page route protection
   if (!session && !PUBLIC_ROUTES.includes(pathname)) {
-    return NextResponse.redirect(new URL('/auth/signin?message=You must be logged in to access this page', request.url));
+    return NextResponse.redirect(
+      new URL('/auth/signin?message=You must be logged in to access this page', request.url)
+    );
   }
 
   // Admin page protection - basic check, with full verification in the API
