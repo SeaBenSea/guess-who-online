@@ -40,7 +40,7 @@ USING (
     EXISTS (
         SELECT 1
         FROM jsonb_array_elements(players) AS player
-        WHERE (player->>'id')::text = auth.uid()
+        WHERE (player->>'id')::uuid = auth.uid()
     )
     -- Or if the room is not started (public)
     OR NOT is_game_started
@@ -56,7 +56,7 @@ USING (
     EXISTS (
         SELECT 1
         FROM jsonb_array_elements(players) AS player
-        WHERE (player->>'id')::text = auth.uid()
+        WHERE (player->>'id')::uuid = auth.uid()
     )
 )
 WITH CHECK (
@@ -64,7 +64,7 @@ WITH CHECK (
     EXISTS (
         SELECT 1
         FROM jsonb_array_elements(players) AS player
-        WHERE (player->>'id')::text = auth.uid()
+        WHERE (player->>'id')::uuid = auth.uid()
     )
 );
 
@@ -78,7 +78,7 @@ USING (
     EXISTS (
         SELECT 1
         FROM jsonb_array_elements(players) AS player
-        WHERE (player->>'id')::text = auth.uid()
+        WHERE (player->>'id')::uuid = auth.uid()
     )
 );
 
