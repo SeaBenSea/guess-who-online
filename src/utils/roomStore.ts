@@ -2,6 +2,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { Character } from '@/types/character';
 import { PoolCharacter } from '@/types/poolCharacter';
+import { logAdminAction } from '@/utils/adminLogger';
 
 interface PlayerState {
   id: string; // user ID
@@ -750,6 +751,16 @@ class RoomStore {
         this.debug('deleteRoom:error', { error: error.message });
         return false;
       }
+
+      // Log the admin action
+      await logAdminAction({
+        actionType: 'room_deletion',
+        targetId: roomId,
+        targetType: 'room',
+        details: {
+          timestamp: new Date().toISOString(),
+        },
+      });
 
       this.debug('deleteRoom:success', { roomId });
       return true;

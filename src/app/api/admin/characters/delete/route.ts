@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyAdminAccess } from '@/utils/adminAuth';
+import { logAdminAction } from '@/utils/adminLogger';
 
 export async function POST(request: Request) {
   try {
@@ -11,7 +12,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }
 
-    const { supabase } = result;
+    const { supabase, user: adminUser } = result;
 
     // Delete the character using a function that bypasses RLS
     const { error } = await supabase.rpc('admin_delete_character', {
@@ -22,6 +23,17 @@ export async function POST(request: Request) {
       console.error('Error deleting character:', error);
       return NextResponse.json({ error: 'Failed to delete character' }, { status: 500 });
     }
+
+    // Log the admin action
+    await logAdminAction({
+      actionType: 'character_deletion',
+      targetId: characterId,
+      targetType: 'character',
+      details: {
+        timestamp: new Date().toISOString(),
+        performed_by_email: adminUser.email || 'unknown',
+      },
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {
