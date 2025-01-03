@@ -126,24 +126,37 @@ export default function GameRoom({ params }: GameRoomProps) {
         if (room) {
           setPlayers(room.players || []);
 
-          // Show character pick modal if game is started
-          if (room.is_game_started && !showPickModal) {
+          // Check if we're already in the room
+          const isInRoom = room.players?.some(p => p.id === userId) || false;
+          hasJoined.current = isInRoom;
+
+          // Handle game state restoration
+          if (room.is_game_started) {
             setShowPickModal(true);
-            setPlayerPicks(
-              room.players.map(p => ({
-                id: p.id,
-                name: p.name,
-                characterId: undefined,
-                isReady: false,
-              }))
-            );
+            // Restore player picks state
+            const picks = room.players.map(p => ({
+              id: p.id,
+              name: p.name,
+              characterId: room.player_picks?.[p.id],
+              isReady: room.player_picks_state?.[p.id]?.isReady || false,
+            }));
+            setPlayerPicks(picks);
+
+            // If all players are ready, redirect to game
+            if (picks.every(p => p.isReady)) {
+              router.push(`/game/${code}`);
+              return;
+            }
           }
 
-          // Check if we're already in the room
-          hasJoined.current = room.players?.some(p => p.id === userId) || false;
+          // If not in room or reconnecting, try to join
+          if (!isInRoom) {
+            const canJoinResult = await roomStore.canJoinRoom(code, userId, nickname);
+            if (!canJoinResult.canJoin) {
+              setError(canJoinResult.reason || 'Cannot join room');
+              return;
+            }
 
-          // If not in room, join
-          if (!hasJoined.current) {
             const joined = await roomStore.joinRoom(code, userId, nickname);
             if (joined) {
               hasJoined.current = true;
@@ -164,36 +177,38 @@ export default function GameRoom({ params }: GameRoomProps) {
 
           setPlayers(updatedRoom.players || []);
 
-          // Show character pick modal if game is started
+          // Handle game state updates
           if (updatedRoom.is_game_started) {
             if (!showPickModal) {
               setShowPickModal(true);
-              setPlayerPicks(
-                updatedRoom.players.map(p => ({
-                  id: p.id,
-                  name: p.name,
-                  characterId: undefined,
-                  isReady: false,
-                }))
-              );
             }
 
             // Update player picks from the room state
-            if (updatedRoom.player_picks_state) {
-              setPlayerPicks(
-                updatedRoom.players.map(p => ({
-                  id: p.id,
-                  name: p.name,
-                  characterId: updatedRoom.player_picks?.[p.id],
-                  isReady: updatedRoom.player_picks_state?.[p.id]?.isReady || false,
-                }))
-              );
+            const picks = updatedRoom.players.map(p => ({
+              id: p.id,
+              name: p.name,
+              characterId: updatedRoom.player_picks?.[p.id],
+              isReady: updatedRoom.player_picks_state?.[p.id]?.isReady || false,
+            }));
+            setPlayerPicks(picks);
+
+            // If all players are ready, redirect to game
+            if (picks.every(p => p.isReady)) {
+              router.push(`/game/${code}`);
+              return;
             }
           }
 
-          // If we're not in the players list anymore, redirect to home
-          if (!updatedRoom.players?.some(p => p.id === userId)) {
-            router.replace('/');
+          // If we're not in the players list anymore and we were previously joined,
+          // attempt to rejoin if possible
+          if (!updatedRoom.players?.some(p => p.id === userId) && hasJoined.current) {
+            roomStore.canJoinRoom(code, userId, nickname).then(async ({ canJoin }) => {
+              if (canJoin) {
+                await roomStore.joinRoom(code, userId, nickname);
+              } else {
+                router.replace('/');
+              }
+            });
           }
         });
       } catch (error) {
