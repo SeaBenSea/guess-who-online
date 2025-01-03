@@ -45,6 +45,7 @@ CREATE OR REPLACE FUNCTION admin_delete_character(character_id UUID)
 RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER -- This makes the function run with the privileges of the owner
+SET search_path = public
 AS $$
 BEGIN
   DELETE FROM characters WHERE id = character_id;
