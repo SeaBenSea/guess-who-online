@@ -37,14 +37,19 @@ BEGIN
     -- 1. The winner matches the room's winner
     -- 2. Both players were part of the game (check player_picks)
     -- 3. The game was actually played (check player_guesses exists)
-    SELECT 
-        winner INTO room_winner,
-        (player_picks ? winner_id::text AND player_picks ? loser_id::text) INTO has_picks,
-        (player_guesses IS NOT NULL) INTO has_guesses
+    SELECT winner INTO room_winner
     FROM public.rooms
     WHERE id = room_id
     AND winner = winner_id;
 
+    SELECT (player_picks ? winner_id::text AND player_picks ? loser_id::text) INTO has_picks
+    FROM public.rooms
+    WHERE id = room_id;
+
+    SELECT (player_guesses IS NOT NULL) INTO has_guesses
+    FROM public.rooms
+    WHERE id = room_id;
+    
     IF room_winner IS NULL OR NOT has_picks OR NOT has_guesses THEN
         RAISE EXCEPTION 'Invalid game result';
     END IF;
