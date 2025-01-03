@@ -110,9 +110,20 @@ export default function Home() {
           </div>
         ) : (
           <div className="text-center mb-8">
-            <p className="text-lg">
-              Playing as: <span className="font-bold">{session.user.user_metadata.username}</span>
-            </p>
+            <div className="flex items-center justify-center gap-4">
+              <p className="text-lg">
+                Playing as: <span className="font-bold">{session.user.user_metadata.username}</span>
+              </p>
+              <button
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  router.refresh();
+                }}
+                className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors"
+              >
+                Sign Out
+              </button>
+            </div>
           </div>
         )}
 
