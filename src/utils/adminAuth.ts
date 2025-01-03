@@ -36,4 +36,4 @@ export async function verifyAdminAccess() {
   }
 
   return { user, supabase };
-} 
+}

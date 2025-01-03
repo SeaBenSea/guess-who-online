@@ -18,7 +18,7 @@ interface Room {
   player_picks?: { [key: string]: string }; //userId -> characterId
   player_picks_state?: { [key: string]: { characterId?: string; isReady: boolean } }; //userId -> pick state
   player_guesses?: { [key: string]: { characterId: string; timestamp: string }[] }; //userId -> guesses
-  winner?: string; //userId of winner
+  winner?: string | null; //userId of winner (UUID)
 }
 
 class RoomStore {
@@ -193,7 +193,7 @@ class RoomStore {
           await this.supabase.from('rooms').update({ winner: opponent.id }).eq('id', code);
 
           // Update leaderboard for forfeit
-          await this.updateLeaderboard(opponent.id, userId);
+          await this.updateLeaderboard(opponent.id, userId, code);
         }
       }
 
@@ -620,26 +620,8 @@ class RoomStore {
     return room?.winner || null;
   }
 
-  private async updateLeaderboard(winnerId: string, loserId: string) {
-    this.debug('updateLeaderboard', { winnerId, loserId });
-
-    // Get winner's display name
-    const { data: winnerRoom } = await this.supabase
-      .from('rooms')
-      .select('players')
-      .eq('id', winnerId)
-      .single();
-    const winnerName =
-      winnerRoom?.players?.find((p: PlayerState) => p.id === winnerId)?.name || 'Unknown';
-
-    // Get loser's display name
-    const { data: loserRoom } = await this.supabase
-      .from('rooms')
-      .select('players')
-      .eq('id', loserId)
-      .single();
-    const loserName =
-      loserRoom?.players?.find((p: PlayerState) => p.id === loserId)?.name || 'Unknown';
+  private async updateLeaderboard(winnerId: string, loserId: string, roomId: string) {
+    this.debug('updateLeaderboard', { winnerId, loserId, roomId });
 
     try {
       const response = await fetch('/api/leaderboard/update', {
@@ -649,9 +631,8 @@ class RoomStore {
         },
         body: JSON.stringify({
           winnerId,
-          winnerName,
           loserId,
-          loserName,
+          roomId,
         }),
       });
 
@@ -721,7 +702,7 @@ class RoomStore {
       }
 
       // Update leaderboard
-      await this.updateLeaderboard(userId, opponentUserId);
+      await this.updateLeaderboard(userId, opponentUserId, code);
       return true;
     }
 
@@ -741,7 +722,7 @@ class RoomStore {
       }
 
       // Update leaderboard
-      await this.updateLeaderboard(opponentUserId, userId);
+      await this.updateLeaderboard(opponentUserId, userId, code);
       return true;
     }
 

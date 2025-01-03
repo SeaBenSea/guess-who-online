@@ -1,13 +1,13 @@
 -- Create rooms table
 CREATE TABLE IF NOT EXISTS public.rooms (
     id text PRIMARY KEY,
-    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
-    players jsonb DEFAULT '[]'::jsonb,
-    is_game_started boolean DEFAULT false,
-    player_picks jsonb DEFAULT '{}'::jsonb,
-    player_picks_state jsonb DEFAULT '{}'::jsonb,
-    player_guesses jsonb DEFAULT '{}'::jsonb, -- {nickname: {characterId: string, timestamp: string}[]}
-    winner text -- nickname of the winner
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    players JSONB DEFAULT '[]'::jsonb,
+    is_game_started BOOLEAN DEFAULT false,
+    player_picks JSONB DEFAULT '{}'::jsonb,
+    player_picks_state JSONB DEFAULT '{}'::jsonb,
+    player_guesses JSONB DEFAULT '{}'::jsonb, -- {userId: {characterId: string, timestamp: string}[]}
+    winner UUID REFERENCES auth.users(id) -- winner's user ID
 );
 
 -- Add for rooms table

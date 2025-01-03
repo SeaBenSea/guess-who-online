@@ -25,7 +25,7 @@ interface Room {
   player_picks?: { [key: string]: string };
   player_picks_state?: { [key: string]: { characterId?: string; isReady: boolean } };
   player_guesses?: { [key: string]: { characterId: string; timestamp: string }[] };
-  winner?: string;
+  winner?: string | null;
 }
 
 interface AdminStats {

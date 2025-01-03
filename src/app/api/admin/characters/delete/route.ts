@@ -4,7 +4,7 @@ import { verifyAdminAccess } from '@/utils/adminAuth';
 export async function POST(request: Request) {
   try {
     const { characterId } = await request.json();
-    
+
     const result = await verifyAdminAccess();
 
     if ('error' in result) {

@@ -7,10 +7,7 @@ const PUBLIC_ROUTES = ['/', '/auth/signin', '/auth/signup', '/auth/verify-email'
 const PUBLIC_API_ROUTES = ['/api/auth/check-availability'];
 
 // Basic check without service role - final verification happens in API routes
-async function basicAdminCheck(
-  supabase: SupabaseClient,
-  session: { user: User } | null
-) {
+async function basicAdminCheck(supabase: SupabaseClient, session: { user: User } | null) {
   if (!session) {
     return false;
   }
