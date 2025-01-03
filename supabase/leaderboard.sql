@@ -49,7 +49,7 @@ BEGIN
     SELECT (player_guesses IS NOT NULL) INTO has_guesses
     FROM public.rooms
     WHERE id = room_id;
-    
+
     IF room_winner IS NULL OR NOT has_picks OR NOT has_guesses THEN
         RAISE EXCEPTION 'Invalid game result';
     END IF;

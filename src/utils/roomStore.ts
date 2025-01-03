@@ -18,7 +18,7 @@ interface Room {
   player_picks?: { [key: string]: string }; //userId -> characterId
   player_picks_state?: { [key: string]: { characterId?: string; isReady: boolean } }; //userId -> pick state
   player_guesses?: { [key: string]: { characterId: string; timestamp: string }[] }; //userId -> guesses
-  winner?: string; //userId of winner
+  winner?: string | null; //userId of winner (UUID)
 }
 
 class RoomStore {
