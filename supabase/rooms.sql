@@ -22,11 +22,6 @@ ALTER TABLE public.rooms
 -- Enable RLS
 ALTER TABLE public.rooms ENABLE ROW LEVEL SECURITY;
 
--- Drop existing policies if they exist
-DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.rooms;
-DROP POLICY IF EXISTS "Enable update for authenticated users only" ON public.rooms;
-DROP POLICY IF EXISTS "Enable delete for authenticated users only" ON public.rooms;
-
 -- Create policies
 -- Allow authenticated users to create new rooms
 CREATE POLICY "Enable insert for authenticated users only"
