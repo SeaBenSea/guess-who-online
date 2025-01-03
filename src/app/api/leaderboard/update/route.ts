@@ -14,10 +14,7 @@ export async function POST(request: Request) {
 
     // Validate input
     if (!winnerId || !loserId || !roomId) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
     // Get supabase client with service role
@@ -36,12 +33,9 @@ export async function POST(request: Request) {
       data: { session },
       error: sessionError,
     } = await supabase.auth.getSession();
-    
+
     if (sessionError || !session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Verify the room exists and the game is actually finished
@@ -52,10 +46,7 @@ export async function POST(request: Request) {
       .single();
 
     if (roomError || !room) {
-      return NextResponse.json(
-        { error: 'Room not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Room not found' }, { status: 404 });
     }
 
     // Verify that:
@@ -68,10 +59,7 @@ export async function POST(request: Request) {
       !room.player_picks?.[loserId] ||
       !room.player_guesses
     ) {
-      return NextResponse.json(
-        { error: 'Invalid game result' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Invalid game result' }, { status: 400 });
     }
 
     // Call the database function to update leaderboard
@@ -83,18 +71,12 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error('Error updating leaderboard:', error);
-      return NextResponse.json(
-        { error: 'Failed to update leaderboard' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to update leaderboard' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error in leaderboard update:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
