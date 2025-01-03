@@ -1,5 +1,6 @@
 import SignInForm from '@/components/auth/SignInForm';
 import AuthLinks from '@/components/auth/AuthLinks';
+import { Suspense } from 'react';
 
 export default function SignInPage() {
   return (
@@ -10,7 +11,9 @@ export default function SignInPage() {
           <p className="mt-2 text-gray-600">Welcome back to Guess Who Online</p>
         </div>
 
-        <SignInForm />
+        <Suspense fallback={<div>Loading...</div>}>
+          <SignInForm />
+        </Suspense>
         <AuthLinks type="signin" />
       </div>
     </main>

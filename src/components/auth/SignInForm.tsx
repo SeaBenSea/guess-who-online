@@ -1,19 +1,50 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { AuthError } from '@supabase/supabase-js';
 import Link from 'next/link';
 
+function LoadingSkeleton() {
+  return (
+    <div className="w-full max-w-md space-y-4 animate-pulse">
+      <div className="h-10 bg-gray-200 rounded-lg w-full"></div>
+      <div className="space-y-2">
+        <div className="h-5 bg-gray-200 rounded w-1/4"></div>
+        <div className="h-10 bg-gray-200 rounded-lg w-full"></div>
+      </div>
+      <div className="space-y-2">
+        <div className="h-5 bg-gray-200 rounded w-1/4"></div>
+        <div className="h-10 bg-gray-200 rounded-lg w-full"></div>
+      </div>
+      <div className="h-12 bg-gray-200 rounded-lg w-full"></div>
+    </div>
+  );
+}
+
 export default function SignInForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
+  const [isParamsLoaded, setIsParamsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
+
+  useEffect(() => {
+    const message = searchParams.get('message');
+    if (message) {
+      setError(message);
+    }
+    setIsParamsLoaded(true);
+  }, [searchParams]);
+
+  if (!isParamsLoaded) {
+    return <LoadingSkeleton />;
+  }
 
   const supabase = createClientComponentClient();
 
