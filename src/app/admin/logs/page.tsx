@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
-import { supabase } from '@/utils/supabase';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 interface AdminLog {
   id: string;
@@ -35,8 +35,29 @@ export default function AdminLogsPage() {
   const [logs, setLogs] = useState<AdminLog[]>([]);
   const [actionFilter, setActionFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const supabase = createClientComponentClient();
 
-  // Check if user is admin
+  const loadLogs = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('admin_logs')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error loading logs:', error);
+        return;
+      }
+
+      setLogs(data || []);
+    } catch (error) {
+      console.error('Error loading logs:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [supabase]);
+
   useEffect(() => {
     const checkAdminAccess = async () => {
       setIsCheckingAccess(true);
@@ -62,28 +83,7 @@ export default function AdminLogsPage() {
     };
 
     checkAdminAccess();
-  }, [router]);
-
-  const loadLogs = async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('admin_logs')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error loading logs:', error);
-        return;
-      }
-
-      setLogs(data || []);
-    } catch (error) {
-      console.error('Error loading logs:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [router, loadLogs]);
 
   const filteredLogs = logs
     .filter(log => {
@@ -204,17 +204,15 @@ export default function AdminLogsPage() {
                 <tbody>
                   {filteredLogs.map(log => (
                     <tr key={log.id} className="border-b border-gray-700/50 hover:bg-white/5">
-                      <td className="p-3">
-                        {new Date(log.created_at).toLocaleString()}
-                      </td>
+                      <td className="p-3">{new Date(log.created_at).toLocaleString()}</td>
                       <td className="p-3">
                         <span
                           className={`px-2 py-1 rounded-full text-xs ${
                             log.action_type === 'admin_role_change'
                               ? 'bg-blue-500/20 text-blue-300'
                               : log.action_type === 'room_deletion'
-                              ? 'bg-red-500/20 text-red-300'
-                              : 'bg-yellow-500/20 text-yellow-300'
+                                ? 'bg-red-500/20 text-red-300'
+                                : 'bg-yellow-500/20 text-yellow-300'
                           }`}
                         >
                           {log.action_type.replace(/_/g, ' ')}
@@ -239,4 +237,4 @@ export default function AdminLogsPage() {
       </div>
     </main>
   );
-} 
+}
