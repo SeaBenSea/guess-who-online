@@ -26,6 +26,8 @@ export async function POST(request: Request) {
 
     // Log the admin action
     await logAdminAction({
+      supabaseClient: supabase,
+      userId: adminUser.id,
       actionType: 'admin_role_change',
       targetId: userId,
       targetType: 'user',

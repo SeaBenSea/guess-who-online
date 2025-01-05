@@ -752,13 +752,27 @@ class RoomStore {
         return false;
       }
 
+      // Get current user
+      const {
+        data: { user },
+        error: userError,
+      } = await this.supabase.auth.getUser();
+
+      if (userError || !user) {
+        this.debug('deleteRoom:error', { error: 'Failed to get user' });
+        return false;
+      }
+
       // Log the admin action
       await logAdminAction({
+        supabaseClient: this.supabase,
+        userId: user.id,
         actionType: 'room_deletion',
         targetId: roomId,
         targetType: 'room',
         details: {
           timestamp: new Date().toISOString(),
+          performed_by_email: user.email || 'unknown',
         },
       });
 
