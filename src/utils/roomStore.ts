@@ -2,6 +2,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { Character } from '@/types/character';
 import { PoolCharacter } from '@/types/poolCharacter';
+import { logAdminAction } from '@/utils/adminLogger';
 
 interface PlayerState {
   id: string; // user ID
@@ -750,6 +751,30 @@ class RoomStore {
         this.debug('deleteRoom:error', { error: error.message });
         return false;
       }
+
+      // Get current user
+      const {
+        data: { user },
+        error: userError,
+      } = await this.supabase.auth.getUser();
+
+      if (userError || !user) {
+        this.debug('deleteRoom:error', { error: 'Failed to get user' });
+        return false;
+      }
+
+      // Log the admin action
+      await logAdminAction({
+        supabaseClient: this.supabase,
+        userId: user.id,
+        actionType: 'room_deletion',
+        targetId: roomId,
+        targetType: 'room',
+        details: {
+          timestamp: new Date().toISOString(),
+          performed_by_email: user.email || 'unknown',
+        },
+      });
 
       this.debug('deleteRoom:success', { roomId });
       return true;

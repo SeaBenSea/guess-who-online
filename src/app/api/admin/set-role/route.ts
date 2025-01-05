@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyAdminAccess } from '@/utils/adminAuth';
+import { logAdminAction } from '@/utils/adminLogger';
 
 export async function POST(request: Request) {
   try {
@@ -11,7 +12,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }
 
-    const { supabase } = result;
+    const { supabase, user: adminUser } = result;
 
     // Update user's metadata to set admin role
     const { data, error } = await supabase.auth.admin.updateUserById(userId, {
@@ -22,6 +23,20 @@ export async function POST(request: Request) {
       console.error('Error updating user role:', error);
       return NextResponse.json({ error: 'Failed to update user role' }, { status: 500 });
     }
+
+    // Log the admin action
+    await logAdminAction({
+      supabaseClient: supabase,
+      userId: adminUser.id,
+      actionType: 'admin_role_change',
+      targetId: userId,
+      targetType: 'user',
+      details: {
+        action: isAdmin ? 'granted' : 'revoked',
+        timestamp: new Date().toISOString(),
+        performed_by_email: adminUser.email || 'unknown',
+      },
+    });
 
     return NextResponse.json({ success: true, user: data.user });
   } catch (error) {

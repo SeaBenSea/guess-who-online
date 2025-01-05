@@ -8,7 +8,7 @@ import Navbar from '@/components/Navbar';
 import { PoolCharacter } from '@/types/poolCharacter';
 import { Character, CHARACTER_EMOJIS } from '@/types/character';
 
-type AdminTab = 'overview' | 'rooms' | 'characters' | 'tests' | 'system' | 'users';
+type AdminTab = 'overview' | 'rooms' | 'characters' | 'tests' | 'system' | 'users' | 'logs';
 
 interface PlayerState {
   id: string;
@@ -486,21 +486,27 @@ export default function AdminPage() {
           {/* Navigation Tabs */}
           <div className="border-b border-gray-600">
             <nav className="flex gap-4">
-              {(['overview', 'rooms', 'characters', 'users', 'tests', 'system'] as AdminTab[]).map(
-                tab => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-                      activeTab === tab
-                        ? 'border-blue-500 text-blue-500'
-                        : 'border-transparent hover:border-gray-400'
-                    }`}
-                  >
-                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                  </button>
-                )
-              )}
+              {(
+                ['overview', 'rooms', 'characters', 'users', 'logs', 'tests', 'system'] as const
+              ).map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => {
+                    if (tab === 'logs') {
+                      router.push('/admin/logs');
+                      return;
+                    }
+                    setActiveTab(tab);
+                  }}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
+                    activeTab === tab
+                      ? 'border-blue-500 text-blue-500'
+                      : 'border-transparent hover:border-gray-400'
+                  }`}
+                >
+                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                </button>
+              ))}
             </nav>
           </div>
 

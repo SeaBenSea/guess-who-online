@@ -1,33 +1,26 @@
 -- Create leaderboard table
-CREATE TABLE IF NOT EXISTS public.leaderboard (
-    user_id UUID PRIMARY KEY NOT NULL REFERENCES auth.users(id),
+CREATE TABLE IF NOT EXISTS
+  public.leaderboard (
+    user_id UUID PRIMARY KEY NOT NULL REFERENCES auth.users (id),
     games_played INTEGER NOT NULL DEFAULT 0,
     wins INTEGER NOT NULL DEFAULT 0,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone ('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone ('utc'::text, now()) NOT NULL
+  );
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE public.leaderboard ENABLE ROW LEVEL SECURITY;
 
 -- Create policy to allow anyone to read the leaderboard
-CREATE POLICY "Authenticated users can see leaderboard"
-    ON public.leaderboard
-    FOR SELECT
-    TO authenticated
-    USING (true);
+CREATE POLICY "Authenticated users can see leaderboard" ON public.leaderboard FOR
+SELECT
+  TO authenticated USING (true);
 
 -- Create database function to update leaderboard
-CREATE OR REPLACE FUNCTION update_leaderboard(
-    winner_id UUID,
-    loser_id UUID,
-    room_id TEXT
-)
-RETURNS VOID
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
+CREATE
+OR REPLACE FUNCTION update_leaderboard (winner_id UUID, loser_id UUID, room_id TEXT) RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER
+SET
+  search_path = public AS $$
 DECLARE
     room_winner UUID;
     has_picks BOOLEAN;
@@ -72,17 +65,20 @@ END;
 $$;
 
 -- Revoke direct execute permission from public
-REVOKE EXECUTE ON FUNCTION update_leaderboard FROM public;
+REVOKE
+EXECUTE ON FUNCTION update_leaderboard
+FROM
+  public;
 
 -- Grant execute permission only to service role
-GRANT EXECUTE ON FUNCTION update_leaderboard TO service_role;
+GRANT
+EXECUTE ON FUNCTION update_leaderboard TO service_role;
 
 -- Create function to update updated_at on record change
-CREATE OR REPLACE FUNCTION public.handle_updated_at()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SET search_path = public
-AS $$
+CREATE
+OR REPLACE FUNCTION public.handle_updated_at () RETURNS TRIGGER LANGUAGE plpgsql
+SET
+  search_path = public AS $$
 BEGIN
     NEW.updated_at = timezone('utc'::text, now());
     RETURN NEW;
@@ -90,7 +86,6 @@ END;
 $$;
 
 -- Create trigger to automatically update updated_at
-CREATE TRIGGER handle_updated_at
-    BEFORE UPDATE ON public.leaderboard
-    FOR EACH ROW
-    EXECUTE FUNCTION public.handle_updated_at(); 
+CREATE TRIGGER handle_updated_at BEFORE
+UPDATE ON public.leaderboard FOR EACH ROW
+EXECUTE FUNCTION public.handle_updated_at ();
