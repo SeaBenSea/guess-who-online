@@ -166,6 +166,9 @@ export default function AdminLogsPage() {
                 <option value="room_deletion">Room Deletions</option>
                 <option value="admin_role_change">Admin Role Changes</option>
                 <option value="character_deletion">Character Deletions</option>
+                <option value="user_authentication">User Authentications</option>
+                <option value="update_username">Username Updates</option>
+                <option value="reset_leaderboard">Leaderboard Resets</option>
               </select>
               <input
                 type="text"
@@ -212,7 +215,15 @@ export default function AdminLogsPage() {
                               ? 'bg-blue-500/20 text-blue-300'
                               : log.action_type === 'room_deletion'
                                 ? 'bg-red-500/20 text-red-300'
-                                : 'bg-yellow-500/20 text-yellow-300'
+                                : log.action_type === 'update_username'
+                                  ? 'bg-green-500/20 text-green-300'
+                                  : log.action_type === 'reset_leaderboard'
+                                    ? 'bg-purple-500/20 text-purple-300'
+                                    : log.action_type === 'user_authentication'
+                                      ? 'bg-yellow-500/20 text-yellow-300'
+                                      : log.action_type === 'character_deletion'
+                                        ? 'bg-orange-500/20 text-orange-300'
+                                        : 'bg-yellow-500/20 text-yellow-300'
                           }`}
                         >
                           {log.action_type.replace(/_/g, ' ')}

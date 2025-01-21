@@ -8,7 +8,15 @@ import Navbar from '@/components/Navbar';
 import { PoolCharacter } from '@/types/poolCharacter';
 import { Character, CHARACTER_EMOJIS } from '@/types/character';
 
-type AdminTab = 'overview' | 'rooms' | 'characters' | 'tests' | 'system' | 'users' | 'logs';
+type AdminTab =
+  | 'overview'
+  | 'rooms'
+  | 'characters'
+  | 'tests'
+  | 'system'
+  | 'users'
+  | 'logs'
+  | 'leaderboard';
 
 interface PlayerState {
   id: string;
@@ -32,6 +40,7 @@ interface AdminStats {
   totalRooms: number;
   activeRooms: number;
   totalCharacters: number;
+  totalPlayers: number;
 }
 
 interface RoomDetails extends Room {
@@ -64,9 +73,11 @@ interface AdminUser {
 interface User {
   id: string;
   email: string;
+  email_confirmed_at: string | null;
   user_metadata: {
     username?: string;
     is_admin?: boolean;
+    is_authenticated?: boolean;
     [key: string]: boolean | string | undefined;
   };
   created_at: string;
@@ -84,6 +95,7 @@ export default function AdminPage() {
     totalRooms: 0,
     activeRooms: 0,
     totalCharacters: 0,
+    totalPlayers: 0,
   });
   const [characters, setCharacters] = useState<Character[]>([]);
   const [rooms, setRooms] = useState<RoomDetails[]>([]);
@@ -100,6 +112,11 @@ export default function AdminPage() {
   const [userFilter, setUserFilter] = useState('all');
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [isUpdatingRole, setIsUpdatingRole] = useState(false);
+  const [isResettingLeaderboard, setIsResettingLeaderboard] = useState(false);
+  const [editingUser, setEditingUser] = useState<string | null>(null);
+  const [newUsername, setNewUsername] = useState('');
+  const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
 
   // Check if user is admin
   useEffect(() => {
@@ -146,6 +163,7 @@ export default function AdminPage() {
         totalRooms: rooms.length,
         activeRooms: activeRooms.length,
         totalCharacters: characters.length,
+        totalPlayers: rooms.reduce((sum, room) => sum + room.players.length, 0),
       });
     } catch (error) {
       console.error('Error loading stats:', error);
@@ -367,18 +385,37 @@ export default function AdminPage() {
     }
   };
 
-  const filteredUsers = users
-    .filter(user => {
-      if (userFilter === 'admin') return user.user_metadata?.is_admin === true;
-      if (userFilter === 'regular') return !user.user_metadata?.is_admin;
-      return true;
-    })
-    .filter(
-      user =>
-        user.email.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
-        user.user_metadata?.username?.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
-        user.id.toLowerCase().includes(userSearchQuery.toLowerCase())
-    );
+  const handleResetLeaderboard = async () => {
+    if (
+      !window.confirm(
+        'Are you sure you want to reset the leaderboard? This action cannot be undone.'
+      )
+    ) {
+      return;
+    }
+
+    setIsResettingLeaderboard(true);
+    try {
+      const response = await fetch('/api/admin/reset-leaderboard', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to reset leaderboard');
+      }
+
+      alert('Leaderboard has been reset successfully');
+      loadStats();
+    } catch (error) {
+      console.error('Error resetting leaderboard:', error);
+      alert('Failed to reset leaderboard. Please try again.');
+    } finally {
+      setIsResettingLeaderboard(false);
+    }
+  };
 
   // Load characters when the characters tab is active
   useEffect(() => {
@@ -433,6 +470,617 @@ export default function AdminPage() {
     }
   };
 
+  const handleUpdateUsername = async (userId: string) => {
+    if (!newUsername.trim()) {
+      alert('Please enter a valid username');
+      return;
+    }
+
+    setIsUpdatingUsername(true);
+    try {
+      const response = await fetch('/api/admin/update-username', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          newUsername: newUsername.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update username');
+      }
+
+      // Update local state
+      setUsers(prevUsers =>
+        prevUsers.map(user =>
+          user.id === userId
+            ? {
+                ...user,
+                user_metadata: {
+                  ...user.user_metadata,
+                  username: newUsername.trim(),
+                },
+              }
+            : user
+        )
+      );
+
+      setEditingUser(null);
+      setNewUsername('');
+      alert('Username updated successfully');
+    } catch (error) {
+      console.error('Error updating username:', error);
+      alert('Failed to update username. Please try again.');
+    } finally {
+      setIsUpdatingUsername(false);
+    }
+  };
+
+  const handleAuthenticateUser = async (userId: string, isAuthenticated: boolean) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to ${isAuthenticated ? 'authenticate' : 'unauthenticate'} this user?`
+      )
+    ) {
+      return;
+    }
+
+    setIsAuthenticating(true);
+    try {
+      const response = await fetch('/api/admin/authenticate-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId, isAuthenticated }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update user authentication');
+      }
+
+      // Update local state
+      setUsers(prevUsers =>
+        prevUsers.map(user =>
+          user.id === userId
+            ? {
+                ...user,
+                user_metadata: {
+                  ...user.user_metadata,
+                  is_authenticated: isAuthenticated,
+                },
+              }
+            : user
+        )
+      );
+
+      alert('User authentication status updated successfully');
+    } catch (error) {
+      console.error('Error updating user authentication:', error);
+      alert('Failed to update user authentication status');
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  const renderUsersTab = () => {
+    const filteredUsers = users
+      .filter(user => {
+        if (userFilter === 'admin') return user.user_metadata?.is_admin;
+        if (userFilter === 'regular') return !user.user_metadata?.is_admin;
+        return true;
+      })
+      .filter(
+        user =>
+          user.email.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+          user.user_metadata?.username?.toLowerCase().includes(userSearchQuery.toLowerCase())
+      );
+
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row justify-between gap-4">
+          <div className="flex-1">
+            <input
+              type="text"
+              placeholder="Search users..."
+              value={userSearchQuery}
+              onChange={e => setUserSearchQuery(e.target.value)}
+              className="w-full px-4 py-2 rounded bg-white/10 border border-gray-700 focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+          <select
+            value={userFilter}
+            onChange={e => setUserFilter(e.target.value)}
+            className="px-4 py-2 rounded bg-white/10 border border-gray-700 focus:border-blue-500 focus:outline-none"
+          >
+            <option value="all">All Users</option>
+            <option value="admin">Admins</option>
+            <option value="regular">Regular Users</option>
+          </select>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-700">
+            <thead>
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                  Email
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                  Username
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                  Role
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                  Email Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-700">
+              {filteredUsers.map(user => (
+                <tr key={user.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">{user.email}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    {editingUser === user.id ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={newUsername}
+                          onChange={e => setNewUsername(e.target.value)}
+                          placeholder="Enter new username"
+                          className="px-2 py-1 rounded bg-white/10 border border-gray-700 focus:border-blue-500 focus:outline-none"
+                        />
+                        <button
+                          onClick={() => handleUpdateUsername(user.id)}
+                          disabled={isUpdatingUsername}
+                          className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                        >
+                          {isUpdatingUsername ? 'Saving...' : 'Save'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingUser(null);
+                            setNewUsername('');
+                          }}
+                          className="px-2 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span>{user.user_metadata?.username || '-'}</span>
+                        <button
+                          onClick={() => {
+                            setEditingUser(user.id);
+                            setNewUsername(user.user_metadata?.username || '');
+                          }}
+                          className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                        >
+                          Edit
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span
+                      className={`px-2 py-1 text-xs rounded ${
+                        user.user_metadata?.is_admin
+                          ? 'bg-purple-600/20 text-purple-400'
+                          : 'bg-gray-600/20 text-gray-400'
+                      }`}
+                    >
+                      {user.user_metadata?.is_admin ? 'Admin' : 'User'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span
+                      className={`px-2 py-1 text-xs rounded ${
+                        user.email_confirmed_at
+                          ? 'bg-green-600/20 text-green-400'
+                          : 'bg-red-600/20 text-red-400'
+                      }`}
+                    >
+                      {user.email_confirmed_at ? 'Confirmed' : 'Not Confirmed'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleRoleUpdate(user.id, !user.user_metadata?.is_admin)}
+                        disabled={isUpdatingRole}
+                        className={`px-2 py-1 text-xs rounded ${
+                          user.user_metadata?.is_admin
+                            ? 'bg-red-600 hover:bg-red-700'
+                            : 'bg-purple-600 hover:bg-purple-700'
+                        } text-white disabled:opacity-50`}
+                      >
+                        {isUpdatingRole
+                          ? 'Updating...'
+                          : user.user_metadata?.is_admin
+                            ? 'Remove Admin'
+                            : 'Make Admin'}
+                      </button>
+                      {!user.email_confirmed_at && (
+                        <button
+                          onClick={() => handleAuthenticateUser(user.id, !user.email_confirmed_at)}
+                          disabled={isAuthenticating}
+                          className={`px-2 py-1 text-xs rounded bg-green-600 hover:bg-green-700 text-white disabled:opacity-50`}
+                        >
+                          {isAuthenticating ? 'Updating...' : 'Confirm Email'}
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
+  const renderLeaderboardTab = () => {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold">Leaderboard Management</h2>
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold">Reset Leaderboard</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                This will reset all player statistics. This action cannot be undone.
+              </p>
+            </div>
+            <button
+              onClick={handleResetLeaderboard}
+              disabled={isResettingLeaderboard}
+              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+            >
+              {isResettingLeaderboard ? 'Resetting...' : 'Reset Leaderboard'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderContent = () => {
+    if (isCheckingAccess) {
+      return <div>Checking access...</div>;
+    }
+
+    switch (activeTab) {
+      case 'overview':
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-4 bg-blue-500/10 rounded-lg">
+              <h3 className="text-lg font-medium mb-2">Total Rooms</h3>
+              <p className="text-3xl font-bold">{stats.totalRooms}</p>
+            </div>
+            <div className="p-4 bg-green-500/10 rounded-lg">
+              <h3 className="text-lg font-medium mb-2">Active Rooms</h3>
+              <p className="text-3xl font-bold">{stats.activeRooms}</p>
+            </div>
+            <div className="p-4 bg-purple-500/10 rounded-lg">
+              <h3 className="text-lg font-medium mb-2">Total Characters</h3>
+              <p className="text-3xl font-bold">{stats.totalCharacters}</p>
+            </div>
+          </div>
+        );
+      case 'rooms':
+        return (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between gap-4">
+              <div className="flex gap-4">
+                <select
+                  value={roomFilter}
+                  onChange={e => setRoomFilter(e.target.value)}
+                  className="px-3 py-2 bg-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">All Rooms</option>
+                  <option value="active">Active Rooms</option>
+                  <option value="inactive">Inactive Rooms</option>
+                </select>
+                <input
+                  type="text"
+                  placeholder="Search rooms or players..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="px-3 py-2 bg-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <button
+                onClick={handleCleanup}
+                disabled={isLoading}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {isLoading ? 'Cleaning...' : 'Clean Inactive Rooms'}
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left border-b border-gray-600">
+                    <th className="p-3">Room Code</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3">Players</th>
+                    <th className="p-3">Duration</th>
+                    <th className="p-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRooms.map(room => (
+                    <tr key={room.id} className="border-b border-gray-700/50 hover:bg-white/5">
+                      <td className="p-3">{room.id}</td>
+                      <td className="p-3">
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs ${
+                            room.is_game_started
+                              ? 'bg-green-500/20 text-green-300'
+                              : room.players.length > 0
+                                ? 'bg-yellow-500/20 text-yellow-300'
+                                : 'bg-gray-500/20 text-gray-300'
+                          }`}
+                        >
+                          {room.is_game_started
+                            ? 'In Game'
+                            : room.players.length > 0
+                              ? 'Waiting'
+                              : 'Empty'}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <div className="flex flex-col gap-1">
+                          {room.players.map((player, idx) => (
+                            <span key={idx} className="text-sm">
+                              {player.name}
+                              {player.isReady && ' ✓'}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="p-3">{room.duration} min</td>
+                      <td className="p-3">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleDeleteRoom(room.id)}
+                            className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      case 'characters':
+        return (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between gap-4">
+              <div className="flex gap-4">
+                <input
+                  type="text"
+                  placeholder="Search characters..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="px-3 py-2 bg-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <button
+                onClick={() => router.push('/characters')}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Add New Character
+              </button>
+            </div>
+
+            {isLoading ? (
+              <div className="flex justify-center items-center py-8">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-gray-400">Loading characters...</p>
+                </div>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left border-b border-gray-600">
+                      <th className="p-3">Name</th>
+                      <th className="p-3">Type</th>
+                      <th className="p-3">Created By</th>
+                      <th className="p-3">Created At</th>
+                      <th className="p-3">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {characters
+                      .filter(char => char.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                      .map(character => (
+                        <tr
+                          key={character.id}
+                          className="border-b border-gray-700/50 hover:bg-white/5"
+                        >
+                          <td className="p-3">{character.name}</td>
+                          <td className="p-3">
+                            <span className="flex items-center gap-2">
+                              <span role="img" aria-label={character.type}>
+                                {CHARACTER_EMOJIS[character.type]}
+                              </span>
+                              {character.type
+                                .split('_')
+                                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                .join(' ')}
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            {users.find(u => u.id === character.createdBy)?.email ||
+                              character.createdBy}
+                          </td>
+                          <td className="p-3">
+                            {new Date(character.createdAt).toLocaleDateString()}
+                          </td>
+                          <td className="p-3">
+                            <button
+                              onClick={() => handleDeleteCharacter(character.id)}
+                              disabled={isLoading}
+                              className="text-red-500 hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    {characters.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="p-3 text-center text-gray-400">
+                          No characters found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      case 'tests':
+        return (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium mb-4">Connection Test</h3>
+              <button
+                onClick={runConnectionTest}
+                disabled={isLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {isLoading ? 'Testing...' : 'Run Test'}
+              </button>
+            </div>
+
+            {testResult && (
+              <div
+                className={`p-4 rounded-lg ${testResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
+              >
+                <p className="font-medium">{testResult.success ? '✅ Success' : '❌ Error'}</p>
+                <p>{testResult.message}</p>
+              </div>
+            )}
+          </div>
+        );
+      case 'system':
+        return (
+          <div className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div
+                className={`p-4 rounded-lg ${
+                  systemHealth.dbStatus === 'connected'
+                    ? 'bg-green-500/10 text-green-300'
+                    : 'bg-red-500/10 text-red-300'
+                }`}
+              >
+                <h3 className="text-lg font-medium mb-2">Database Status</h3>
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`w-3 h-3 rounded-full ${
+                      systemHealth.dbStatus === 'connected' ? 'bg-green-500' : 'bg-red-500'
+                    }`}
+                  />
+                  <p className="text-lg capitalize">{systemHealth.dbStatus}</p>
+                </div>
+              </div>
+
+              <div className="p-4 bg-blue-500/10 rounded-lg">
+                <h3 className="text-lg font-medium mb-2">Active Connections</h3>
+                <p className="text-3xl font-bold">{systemHealth.activeConnections}</p>
+              </div>
+
+              <div className="p-4 bg-purple-500/10 rounded-lg">
+                <h3 className="text-lg font-medium mb-2">Response Time</h3>
+                <p className="text-3xl font-bold">{systemHealth.avgResponseTime}ms</p>
+              </div>
+
+              <div className="p-4 bg-gray-500/10 rounded-lg">
+                <h3 className="text-lg font-medium mb-2">Last Checked</h3>
+                <p className="text-lg">{systemHealth.lastChecked.toLocaleTimeString()}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-bold">System Logs</h3>
+                <button
+                  onClick={checkSystemHealth}
+                  disabled={isLoading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {isLoading ? 'Checking...' : 'Check Now'}
+                </button>
+              </div>
+
+              <div className="bg-black/20 rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-700">
+                      <th className="p-3 text-left">Timestamp</th>
+                      <th className="p-3 text-left">Type</th>
+                      <th className="p-3 text-left">Message</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {systemHealth.errorLogs.map((log, index) => (
+                      <tr key={index} className="border-b border-gray-700/50">
+                        <td className="p-3 font-mono">{log.timestamp.toLocaleString()}</td>
+                        <td className="p-3">
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs ${
+                              log.type === 'error'
+                                ? 'bg-red-500/20 text-red-300'
+                                : 'bg-yellow-500/20 text-yellow-300'
+                            }`}
+                          >
+                            {log.type}
+                          </span>
+                        </td>
+                        <td className="p-3">{log.message}</td>
+                      </tr>
+                    ))}
+                    {systemHealth.errorLogs.length === 0 && (
+                      <tr>
+                        <td colSpan={3} className="p-3 text-center text-gray-400">
+                          No errors logged
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      case 'users':
+        return renderUsersTab();
+      case 'leaderboard':
+        return renderLeaderboardTab();
+      default:
+        return null;
+    }
+  };
+
   if (isCheckingAccess) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center p-24">
@@ -483,11 +1131,19 @@ export default function AdminPage() {
             </button>
           </div>
 
-          {/* Navigation Tabs */}
           <div className="border-b border-gray-600">
             <nav className="flex gap-4">
               {(
-                ['overview', 'rooms', 'characters', 'users', 'logs', 'tests', 'system'] as const
+                [
+                  'overview',
+                  'rooms',
+                  'characters',
+                  'users',
+                  'logs',
+                  'tests',
+                  'system',
+                  'leaderboard',
+                ] as const
               ).map(tab => (
                 <button
                   key={tab}
@@ -510,403 +1166,7 @@ export default function AdminPage() {
             </nav>
           </div>
 
-          {/* Tab Content */}
-          <div className="bg-white/5 p-6 rounded-lg shadow-lg">
-            {activeTab === 'overview' && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="p-4 bg-blue-500/10 rounded-lg">
-                  <h3 className="text-lg font-medium mb-2">Total Rooms</h3>
-                  <p className="text-3xl font-bold">{stats.totalRooms}</p>
-                </div>
-                <div className="p-4 bg-green-500/10 rounded-lg">
-                  <h3 className="text-lg font-medium mb-2">Active Rooms</h3>
-                  <p className="text-3xl font-bold">{stats.activeRooms}</p>
-                </div>
-                <div className="p-4 bg-purple-500/10 rounded-lg">
-                  <h3 className="text-lg font-medium mb-2">Total Characters</h3>
-                  <p className="text-3xl font-bold">{stats.totalCharacters}</p>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'rooms' && (
-              <div className="space-y-6">
-                <div className="flex flex-col sm:flex-row justify-between gap-4">
-                  <div className="flex gap-4">
-                    <select
-                      value={roomFilter}
-                      onChange={e => setRoomFilter(e.target.value)}
-                      className="px-3 py-2 bg-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="all">All Rooms</option>
-                      <option value="active">Active Rooms</option>
-                      <option value="inactive">Inactive Rooms</option>
-                    </select>
-                    <input
-                      type="text"
-                      placeholder="Search rooms or players..."
-                      value={searchQuery}
-                      onChange={e => setSearchQuery(e.target.value)}
-                      className="px-3 py-2 bg-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <button
-                    onClick={handleCleanup}
-                    disabled={isLoading}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-                  >
-                    {isLoading ? 'Cleaning...' : 'Clean Inactive Rooms'}
-                  </button>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left border-b border-gray-600">
-                        <th className="p-3">Room Code</th>
-                        <th className="p-3">Status</th>
-                        <th className="p-3">Players</th>
-                        <th className="p-3">Duration</th>
-                        <th className="p-3">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredRooms.map(room => (
-                        <tr key={room.id} className="border-b border-gray-700/50 hover:bg-white/5">
-                          <td className="p-3">{room.id}</td>
-                          <td className="p-3">
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs ${
-                                room.is_game_started
-                                  ? 'bg-green-500/20 text-green-300'
-                                  : room.players.length > 0
-                                    ? 'bg-yellow-500/20 text-yellow-300'
-                                    : 'bg-gray-500/20 text-gray-300'
-                              }`}
-                            >
-                              {room.is_game_started
-                                ? 'In Game'
-                                : room.players.length > 0
-                                  ? 'Waiting'
-                                  : 'Empty'}
-                            </span>
-                          </td>
-                          <td className="p-3">
-                            <div className="flex flex-col gap-1">
-                              {room.players.map((player, idx) => (
-                                <span key={idx} className="text-sm">
-                                  {player.name}
-                                  {player.isReady && ' ✓'}
-                                </span>
-                              ))}
-                            </div>
-                          </td>
-                          <td className="p-3">{room.duration} min</td>
-                          <td className="p-3">
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleDeleteRoom(room.id)}
-                                className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'characters' && (
-              <div className="space-y-6">
-                <div className="flex flex-col sm:flex-row justify-between gap-4">
-                  <div className="flex gap-4">
-                    <input
-                      type="text"
-                      placeholder="Search characters..."
-                      value={searchQuery}
-                      onChange={e => setSearchQuery(e.target.value)}
-                      className="px-3 py-2 bg-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <button
-                    onClick={() => router.push('/characters')}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  >
-                    Add New Character
-                  </button>
-                </div>
-
-                {isLoading ? (
-                  <div className="flex justify-center items-center py-8">
-                    <div className="flex flex-col items-center gap-4">
-                      <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                      <p className="text-gray-400">Loading characters...</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-left border-b border-gray-600">
-                          <th className="p-3">Name</th>
-                          <th className="p-3">Type</th>
-                          <th className="p-3">Created By</th>
-                          <th className="p-3">Created At</th>
-                          <th className="p-3">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {characters
-                          .filter(char =>
-                            char.name.toLowerCase().includes(searchQuery.toLowerCase())
-                          )
-                          .map(character => (
-                            <tr
-                              key={character.id}
-                              className="border-b border-gray-700/50 hover:bg-white/5"
-                            >
-                              <td className="p-3">{character.name}</td>
-                              <td className="p-3">
-                                <span className="flex items-center gap-2">
-                                  <span role="img" aria-label={character.type}>
-                                    {CHARACTER_EMOJIS[character.type]}
-                                  </span>
-                                  {character.type
-                                    .split('_')
-                                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                                    .join(' ')}
-                                </span>
-                              </td>
-                              <td className="p-3">
-                                {users.find(u => u.id === character.createdBy)?.email ||
-                                  character.createdBy}
-                              </td>
-                              <td className="p-3">
-                                {new Date(character.createdAt).toLocaleDateString()}
-                              </td>
-                              <td className="p-3">
-                                <button
-                                  onClick={() => handleDeleteCharacter(character.id)}
-                                  disabled={isLoading}
-                                  className="text-red-500 hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  Delete
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        {characters.length === 0 && (
-                          <tr>
-                            <td colSpan={5} className="p-3 text-center text-gray-400">
-                              No characters found
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'tests' && (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-medium mb-4">Connection Test</h3>
-                  <button
-                    onClick={runConnectionTest}
-                    disabled={isLoading}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    {isLoading ? 'Testing...' : 'Run Test'}
-                  </button>
-                </div>
-
-                {testResult && (
-                  <div
-                    className={`p-4 rounded-lg ${testResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
-                  >
-                    <p className="font-medium">{testResult.success ? '✅ Success' : '❌ Error'}</p>
-                    <p>{testResult.message}</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'system' && (
-              <div className="space-y-8">
-                {/* System Status Overview */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <div
-                    className={`p-4 rounded-lg ${
-                      systemHealth.dbStatus === 'connected'
-                        ? 'bg-green-500/10 text-green-300'
-                        : 'bg-red-500/10 text-red-300'
-                    }`}
-                  >
-                    <h3 className="text-lg font-medium mb-2">Database Status</h3>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`w-3 h-3 rounded-full ${
-                          systemHealth.dbStatus === 'connected' ? 'bg-green-500' : 'bg-red-500'
-                        }`}
-                      />
-                      <p className="text-lg capitalize">{systemHealth.dbStatus}</p>
-                    </div>
-                  </div>
-
-                  <div className="p-4 bg-blue-500/10 rounded-lg">
-                    <h3 className="text-lg font-medium mb-2">Active Connections</h3>
-                    <p className="text-3xl font-bold">{systemHealth.activeConnections}</p>
-                  </div>
-
-                  <div className="p-4 bg-purple-500/10 rounded-lg">
-                    <h3 className="text-lg font-medium mb-2">Response Time</h3>
-                    <p className="text-3xl font-bold">{systemHealth.avgResponseTime}ms</p>
-                  </div>
-
-                  <div className="p-4 bg-gray-500/10 rounded-lg">
-                    <h3 className="text-lg font-medium mb-2">Last Checked</h3>
-                    <p className="text-lg">{systemHealth.lastChecked.toLocaleTimeString()}</p>
-                  </div>
-                </div>
-
-                {/* Error Logs */}
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-xl font-bold">System Logs</h3>
-                    <button
-                      onClick={checkSystemHealth}
-                      disabled={isLoading}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {isLoading ? 'Checking...' : 'Check Now'}
-                    </button>
-                  </div>
-
-                  <div className="bg-black/20 rounded-lg overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-gray-700">
-                          <th className="p-3 text-left">Timestamp</th>
-                          <th className="p-3 text-left">Type</th>
-                          <th className="p-3 text-left">Message</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {systemHealth.errorLogs.map((log, index) => (
-                          <tr key={index} className="border-b border-gray-700/50">
-                            <td className="p-3 font-mono">{log.timestamp.toLocaleString()}</td>
-                            <td className="p-3">
-                              <span
-                                className={`px-2 py-1 rounded-full text-xs ${
-                                  log.type === 'error'
-                                    ? 'bg-red-500/20 text-red-300'
-                                    : 'bg-yellow-500/20 text-yellow-300'
-                                }`}
-                              >
-                                {log.type}
-                              </span>
-                            </td>
-                            <td className="p-3">{log.message}</td>
-                          </tr>
-                        ))}
-                        {systemHealth.errorLogs.length === 0 && (
-                          <tr>
-                            <td colSpan={3} className="p-3 text-center text-gray-400">
-                              No errors logged
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'users' && (
-              <div className="space-y-6">
-                <div className="flex flex-col sm:flex-row justify-between gap-4">
-                  <div className="flex gap-4">
-                    <select
-                      value={userFilter}
-                      onChange={e => setUserFilter(e.target.value)}
-                      className="px-3 py-2 bg-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="all">All Users</option>
-                      <option value="admin">Admins</option>
-                      <option value="regular">Regular Users</option>
-                    </select>
-                    <input
-                      type="text"
-                      placeholder="Search by email, username, or ID..."
-                      value={userSearchQuery}
-                      onChange={e => setUserSearchQuery(e.target.value)}
-                      className="px-3 py-2 bg-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left border-b border-gray-600">
-                        <th className="p-3">ID</th>
-                        <th className="p-3">Email</th>
-                        <th className="p-3">Username</th>
-                        <th className="p-3">Role</th>
-                        <th className="p-3">Created At</th>
-                        <th className="p-3">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredUsers.map(user => (
-                        <tr key={user.id} className="border-b border-gray-700/50 hover:bg-white/5">
-                          <td className="p-3">
-                            <span className="font-mono text-xs">{user.id}</span>
-                          </td>
-                          <td className="p-3">{user.email}</td>
-                          <td className="p-3">{user.user_metadata?.username || '-'}</td>
-                          <td className="p-3">
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs ${
-                                user.user_metadata?.is_admin
-                                  ? 'bg-blue-500/20 text-blue-300'
-                                  : 'bg-gray-500/20 text-gray-300'
-                              }`}
-                            >
-                              {user.user_metadata?.is_admin ? 'Admin' : 'User'}
-                            </span>
-                          </td>
-                          <td className="p-3">{new Date(user.created_at).toLocaleDateString()}</td>
-                          <td className="p-3">
-                            <button
-                              onClick={() =>
-                                handleRoleUpdate(user.id, !user.user_metadata?.is_admin)
-                              }
-                              disabled={isUpdatingRole || user.id === adminUser?.id}
-                              className={`px-2 py-1 text-xs rounded ${
-                                user.user_metadata?.is_admin
-                                  ? 'bg-red-600 hover:bg-red-700'
-                                  : 'bg-blue-600 hover:bg-blue-700'
-                              } text-white disabled:opacity-50 disabled:cursor-not-allowed`}
-                            >
-                              {user.user_metadata?.is_admin ? 'Remove Admin' : 'Make Admin'}
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
+          <div className="bg-white/5 p-6 rounded-lg shadow-lg">{renderContent()}</div>
         </div>
       </div>
     </main>

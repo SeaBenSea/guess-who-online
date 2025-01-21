@@ -16,6 +16,27 @@ CREATE POLICY "Authenticated users can see leaderboard" ON public.leaderboard FO
 SELECT
   TO authenticated USING (true);
 
+-- Create policy to allow admins to delete leaderboard records
+CREATE POLICY "Admins can delete leaderboard records" ON public.leaderboard FOR DELETE TO authenticated USING (
+  (
+    EXISTS (
+      SELECT
+        (
+          auth.uid () IN (
+            SELECT
+              users.id
+            FROM
+              auth.users
+            WHERE
+              (
+                (users.raw_user_meta_data ->> 'is_admin'::text) = 'true'::text
+              )
+          )
+        )
+    )
+  )
+);
+
 -- Create database function to update leaderboard
 CREATE
 OR REPLACE FUNCTION update_leaderboard (winner_id UUID, loser_id UUID, room_id TEXT) RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER
