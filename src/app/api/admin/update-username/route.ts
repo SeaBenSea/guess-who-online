@@ -26,10 +26,6 @@ export async function POST(request: Request) {
 
     const { user_metadata } = userData.user;
 
-    if (!user_metadata.username) {
-      return NextResponse.json({ error: 'User does not have a username' }, { status: 400 });
-    }
-
     // Update the user's username
     const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
       user_metadata: { username: newUsername },
@@ -48,7 +44,7 @@ export async function POST(request: Request) {
       targetType: 'user',
       details: {
         newUsername,
-        oldUsername: user_metadata.username,
+        oldUsername: user_metadata.username || '',
         performed_by_email: adminUser.email || 'unknown',
         timestamp: new Date().toISOString(),
       },
