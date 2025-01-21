@@ -1,7 +1,12 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 
-export type AdminAction = 'room_deletion' | 'admin_role_change' | 'character_deletion';
-export type TargetType = 'room' | 'user' | 'character';
+export type AdminAction =
+  | 'room_deletion'
+  | 'admin_role_change'
+  | 'character_deletion'
+  | 'update_username'
+  | 'reset_leaderboard';
+export type TargetType = 'room' | 'user' | 'character' | 'leaderboard';
 
 interface LogActionParams {
   supabaseClient: SupabaseClient;
