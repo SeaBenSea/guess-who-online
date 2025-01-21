@@ -579,7 +579,7 @@ export default function AdminPage() {
           user.user_metadata?.username?.toLowerCase().includes(userSearchQuery.toLowerCase())
       );
 
-  return (
+    return (
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between gap-4">
           <div className="flex-1">
@@ -590,7 +590,7 @@ export default function AdminPage() {
               onChange={e => setUserSearchQuery(e.target.value)}
               className="w-full px-4 py-2 rounded bg-white/10 border border-gray-700 focus:border-blue-500 focus:outline-none"
             />
-            </div>
+          </div>
           <select
             value={userFilter}
             onChange={e => setUserFilter(e.target.value)}
@@ -637,7 +637,7 @@ export default function AdminPage() {
                           placeholder="Enter new username"
                           className="px-2 py-1 rounded bg-white/10 border border-gray-700 focus:border-blue-500 focus:outline-none"
                         />
-            <button
+                        <button
                           onClick={() => handleUpdateUsername(user.id)}
                           disabled={isUpdatingUsername}
                           className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
@@ -652,13 +652,13 @@ export default function AdminPage() {
                           className="px-2 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700"
                         >
                           Cancel
-            </button>
-          </div>
+                        </button>
+                      </div>
                     ) : (
                       <div className="flex items-center gap-2">
                         <span>{user.user_metadata?.username || '-'}</span>
-                <button
-                  onClick={() => {
+                        <button
+                          onClick={() => {
                             setEditingUser(user.id);
                             setNewUsername(user.user_metadata?.username || '');
                           }}
@@ -707,17 +707,15 @@ export default function AdminPage() {
                           : user.user_metadata?.is_admin
                             ? 'Remove Admin'
                             : 'Make Admin'}
-                </button>
-                          {!user.email_confirmed_at && (
-                            <button
-                              onClick={() => handleAuthenticateUser(user.id, !user.email_confirmed_at)}
-                              disabled={isAuthenticating}
-                        className={`px-2 py-1 text-xs rounded bg-green-600 hover:bg-green-700 text-white disabled:opacity-50`}
-                      >
-                        {isAuthenticating
-                          ? 'Updating...'
-                          : 'Confirm Email'}
                       </button>
+                      {!user.email_confirmed_at && (
+                        <button
+                          onClick={() => handleAuthenticateUser(user.id, !user.email_confirmed_at)}
+                          disabled={isAuthenticating}
+                          className={`px-2 py-1 text-xs rounded bg-green-600 hover:bg-green-700 text-white disabled:opacity-50`}
+                        >
+                          {isAuthenticating ? 'Updating...' : 'Confirm Email'}
+                        </button>
                       )}
                     </div>
                   </td>
@@ -725,7 +723,7 @@ export default function AdminPage() {
               ))}
             </tbody>
           </table>
-          </div>
+        </div>
       </div>
     );
   };
@@ -763,316 +761,316 @@ export default function AdminPage() {
     switch (activeTab) {
       case 'overview':
         return (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="p-4 bg-blue-500/10 rounded-lg">
-                  <h3 className="text-lg font-medium mb-2">Total Rooms</h3>
-                  <p className="text-3xl font-bold">{stats.totalRooms}</p>
-                </div>
-                <div className="p-4 bg-green-500/10 rounded-lg">
-                  <h3 className="text-lg font-medium mb-2">Active Rooms</h3>
-                  <p className="text-3xl font-bold">{stats.activeRooms}</p>
-                </div>
-                <div className="p-4 bg-purple-500/10 rounded-lg">
-                  <h3 className="text-lg font-medium mb-2">Total Characters</h3>
-                  <p className="text-3xl font-bold">{stats.totalCharacters}</p>
-                </div>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-4 bg-blue-500/10 rounded-lg">
+              <h3 className="text-lg font-medium mb-2">Total Rooms</h3>
+              <p className="text-3xl font-bold">{stats.totalRooms}</p>
+            </div>
+            <div className="p-4 bg-green-500/10 rounded-lg">
+              <h3 className="text-lg font-medium mb-2">Active Rooms</h3>
+              <p className="text-3xl font-bold">{stats.activeRooms}</p>
+            </div>
+            <div className="p-4 bg-purple-500/10 rounded-lg">
+              <h3 className="text-lg font-medium mb-2">Total Characters</h3>
+              <p className="text-3xl font-bold">{stats.totalCharacters}</p>
+            </div>
+          </div>
         );
       case 'rooms':
         return (
-              <div className="space-y-6">
-                <div className="flex flex-col sm:flex-row justify-between gap-4">
-                  <div className="flex gap-4">
-                    <select
-                      value={roomFilter}
-                      onChange={e => setRoomFilter(e.target.value)}
-                      className="px-3 py-2 bg-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="all">All Rooms</option>
-                      <option value="active">Active Rooms</option>
-                      <option value="inactive">Inactive Rooms</option>
-                    </select>
-                    <input
-                      type="text"
-                      placeholder="Search rooms or players..."
-                      value={searchQuery}
-                      onChange={e => setSearchQuery(e.target.value)}
-                      className="px-3 py-2 bg-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <button
-                    onClick={handleCleanup}
-                    disabled={isLoading}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-                  >
-                    {isLoading ? 'Cleaning...' : 'Clean Inactive Rooms'}
-                  </button>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left border-b border-gray-600">
-                        <th className="p-3">Room Code</th>
-                        <th className="p-3">Status</th>
-                        <th className="p-3">Players</th>
-                        <th className="p-3">Duration</th>
-                        <th className="p-3">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredRooms.map(room => (
-                        <tr key={room.id} className="border-b border-gray-700/50 hover:bg-white/5">
-                          <td className="p-3">{room.id}</td>
-                          <td className="p-3">
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs ${
-                                room.is_game_started
-                                  ? 'bg-green-500/20 text-green-300'
-                                  : room.players.length > 0
-                                    ? 'bg-yellow-500/20 text-yellow-300'
-                                    : 'bg-gray-500/20 text-gray-300'
-                              }`}
-                            >
-                              {room.is_game_started
-                                ? 'In Game'
-                                : room.players.length > 0
-                                  ? 'Waiting'
-                                  : 'Empty'}
-                            </span>
-                          </td>
-                          <td className="p-3">
-                            <div className="flex flex-col gap-1">
-                              {room.players.map((player, idx) => (
-                                <span key={idx} className="text-sm">
-                                  {player.name}
-                                  {player.isReady && ' ✓'}
-                                </span>
-                              ))}
-                            </div>
-                          </td>
-                          <td className="p-3">{room.duration} min</td>
-                          <td className="p-3">
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleDeleteRoom(room.id)}
-                                className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between gap-4">
+              <div className="flex gap-4">
+                <select
+                  value={roomFilter}
+                  onChange={e => setRoomFilter(e.target.value)}
+                  className="px-3 py-2 bg-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">All Rooms</option>
+                  <option value="active">Active Rooms</option>
+                  <option value="inactive">Inactive Rooms</option>
+                </select>
+                <input
+                  type="text"
+                  placeholder="Search rooms or players..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="px-3 py-2 bg-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
               </div>
+              <button
+                onClick={handleCleanup}
+                disabled={isLoading}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {isLoading ? 'Cleaning...' : 'Clean Inactive Rooms'}
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left border-b border-gray-600">
+                    <th className="p-3">Room Code</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3">Players</th>
+                    <th className="p-3">Duration</th>
+                    <th className="p-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRooms.map(room => (
+                    <tr key={room.id} className="border-b border-gray-700/50 hover:bg-white/5">
+                      <td className="p-3">{room.id}</td>
+                      <td className="p-3">
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs ${
+                            room.is_game_started
+                              ? 'bg-green-500/20 text-green-300'
+                              : room.players.length > 0
+                                ? 'bg-yellow-500/20 text-yellow-300'
+                                : 'bg-gray-500/20 text-gray-300'
+                          }`}
+                        >
+                          {room.is_game_started
+                            ? 'In Game'
+                            : room.players.length > 0
+                              ? 'Waiting'
+                              : 'Empty'}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <div className="flex flex-col gap-1">
+                          {room.players.map((player, idx) => (
+                            <span key={idx} className="text-sm">
+                              {player.name}
+                              {player.isReady && ' ✓'}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="p-3">{room.duration} min</td>
+                      <td className="p-3">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleDeleteRoom(room.id)}
+                            className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         );
       case 'characters':
         return (
-              <div className="space-y-6">
-                <div className="flex flex-col sm:flex-row justify-between gap-4">
-                  <div className="flex gap-4">
-                    <input
-                      type="text"
-                      placeholder="Search characters..."
-                      value={searchQuery}
-                      onChange={e => setSearchQuery(e.target.value)}
-                      className="px-3 py-2 bg-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <button
-                    onClick={() => router.push('/characters')}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  >
-                    Add New Character
-                  </button>
-                </div>
-
-                {isLoading ? (
-                  <div className="flex justify-center items-center py-8">
-                    <div className="flex flex-col items-center gap-4">
-                      <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                      <p className="text-gray-400">Loading characters...</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-left border-b border-gray-600">
-                          <th className="p-3">Name</th>
-                          <th className="p-3">Type</th>
-                          <th className="p-3">Created By</th>
-                          <th className="p-3">Created At</th>
-                          <th className="p-3">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {characters
-                      .filter(char => char.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                          .map(character => (
-                            <tr
-                              key={character.id}
-                              className="border-b border-gray-700/50 hover:bg-white/5"
-                            >
-                              <td className="p-3">{character.name}</td>
-                              <td className="p-3">
-                                <span className="flex items-center gap-2">
-                                  <span role="img" aria-label={character.type}>
-                                    {CHARACTER_EMOJIS[character.type]}
-                                  </span>
-                                  {character.type
-                                    .split('_')
-                                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                                    .join(' ')}
-                                </span>
-                              </td>
-                              <td className="p-3">
-                                {users.find(u => u.id === character.createdBy)?.email ||
-                                  character.createdBy}
-                              </td>
-                              <td className="p-3">
-                                {new Date(character.createdAt).toLocaleDateString()}
-                              </td>
-                              <td className="p-3">
-                                <button
-                                  onClick={() => handleDeleteCharacter(character.id)}
-                                  disabled={isLoading}
-                                  className="text-red-500 hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  Delete
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        {characters.length === 0 && (
-                          <tr>
-                            <td colSpan={5} className="p-3 text-center text-gray-400">
-                              No characters found
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between gap-4">
+              <div className="flex gap-4">
+                <input
+                  type="text"
+                  placeholder="Search characters..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="px-3 py-2 bg-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
               </div>
+              <button
+                onClick={() => router.push('/characters')}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Add New Character
+              </button>
+            </div>
+
+            {isLoading ? (
+              <div className="flex justify-center items-center py-8">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-gray-400">Loading characters...</p>
+                </div>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left border-b border-gray-600">
+                      <th className="p-3">Name</th>
+                      <th className="p-3">Type</th>
+                      <th className="p-3">Created By</th>
+                      <th className="p-3">Created At</th>
+                      <th className="p-3">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {characters
+                      .filter(char => char.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                      .map(character => (
+                        <tr
+                          key={character.id}
+                          className="border-b border-gray-700/50 hover:bg-white/5"
+                        >
+                          <td className="p-3">{character.name}</td>
+                          <td className="p-3">
+                            <span className="flex items-center gap-2">
+                              <span role="img" aria-label={character.type}>
+                                {CHARACTER_EMOJIS[character.type]}
+                              </span>
+                              {character.type
+                                .split('_')
+                                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                .join(' ')}
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            {users.find(u => u.id === character.createdBy)?.email ||
+                              character.createdBy}
+                          </td>
+                          <td className="p-3">
+                            {new Date(character.createdAt).toLocaleDateString()}
+                          </td>
+                          <td className="p-3">
+                            <button
+                              onClick={() => handleDeleteCharacter(character.id)}
+                              disabled={isLoading}
+                              className="text-red-500 hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    {characters.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="p-3 text-center text-gray-400">
+                          No characters found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         );
       case 'tests':
         return (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-medium mb-4">Connection Test</h3>
-                  <button
-                    onClick={runConnectionTest}
-                    disabled={isLoading}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    {isLoading ? 'Testing...' : 'Run Test'}
-                  </button>
-                </div>
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium mb-4">Connection Test</h3>
+              <button
+                onClick={runConnectionTest}
+                disabled={isLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {isLoading ? 'Testing...' : 'Run Test'}
+              </button>
+            </div>
 
-                {testResult && (
-                  <div
-                    className={`p-4 rounded-lg ${testResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
-                  >
-                    <p className="font-medium">{testResult.success ? '✅ Success' : '❌ Error'}</p>
-                    <p>{testResult.message}</p>
-                  </div>
-                )}
+            {testResult && (
+              <div
+                className={`p-4 rounded-lg ${testResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
+              >
+                <p className="font-medium">{testResult.success ? '✅ Success' : '❌ Error'}</p>
+                <p>{testResult.message}</p>
               </div>
+            )}
+          </div>
         );
       case 'system':
         return (
-              <div className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div
+                className={`p-4 rounded-lg ${
+                  systemHealth.dbStatus === 'connected'
+                    ? 'bg-green-500/10 text-green-300'
+                    : 'bg-red-500/10 text-red-300'
+                }`}
+              >
+                <h3 className="text-lg font-medium mb-2">Database Status</h3>
+                <div className="flex items-center gap-2">
                   <div
-                    className={`p-4 rounded-lg ${
-                      systemHealth.dbStatus === 'connected'
-                        ? 'bg-green-500/10 text-green-300'
-                        : 'bg-red-500/10 text-red-300'
+                    className={`w-3 h-3 rounded-full ${
+                      systemHealth.dbStatus === 'connected' ? 'bg-green-500' : 'bg-red-500'
                     }`}
-                  >
-                    <h3 className="text-lg font-medium mb-2">Database Status</h3>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`w-3 h-3 rounded-full ${
-                          systemHealth.dbStatus === 'connected' ? 'bg-green-500' : 'bg-red-500'
-                        }`}
-                      />
-                      <p className="text-lg capitalize">{systemHealth.dbStatus}</p>
-                    </div>
-                  </div>
-
-                  <div className="p-4 bg-blue-500/10 rounded-lg">
-                    <h3 className="text-lg font-medium mb-2">Active Connections</h3>
-                    <p className="text-3xl font-bold">{systemHealth.activeConnections}</p>
-                  </div>
-
-                  <div className="p-4 bg-purple-500/10 rounded-lg">
-                    <h3 className="text-lg font-medium mb-2">Response Time</h3>
-                    <p className="text-3xl font-bold">{systemHealth.avgResponseTime}ms</p>
-                  </div>
-
-                  <div className="p-4 bg-gray-500/10 rounded-lg">
-                    <h3 className="text-lg font-medium mb-2">Last Checked</h3>
-                    <p className="text-lg">{systemHealth.lastChecked.toLocaleTimeString()}</p>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-xl font-bold">System Logs</h3>
-                    <button
-                      onClick={checkSystemHealth}
-                      disabled={isLoading}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {isLoading ? 'Checking...' : 'Check Now'}
-                    </button>
-                  </div>
-
-                  <div className="bg-black/20 rounded-lg overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-gray-700">
-                          <th className="p-3 text-left">Timestamp</th>
-                          <th className="p-3 text-left">Type</th>
-                          <th className="p-3 text-left">Message</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {systemHealth.errorLogs.map((log, index) => (
-                          <tr key={index} className="border-b border-gray-700/50">
-                            <td className="p-3 font-mono">{log.timestamp.toLocaleString()}</td>
-                            <td className="p-3">
-                              <span
-                                className={`px-2 py-1 rounded-full text-xs ${
-                                  log.type === 'error'
-                                    ? 'bg-red-500/20 text-red-300'
-                                    : 'bg-yellow-500/20 text-yellow-300'
-                                }`}
-                              >
-                                {log.type}
-                              </span>
-                            </td>
-                            <td className="p-3">{log.message}</td>
-                          </tr>
-                        ))}
-                        {systemHealth.errorLogs.length === 0 && (
-                          <tr>
-                            <td colSpan={3} className="p-3 text-center text-gray-400">
-                              No errors logged
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                  />
+                  <p className="text-lg capitalize">{systemHealth.dbStatus}</p>
                 </div>
               </div>
+
+              <div className="p-4 bg-blue-500/10 rounded-lg">
+                <h3 className="text-lg font-medium mb-2">Active Connections</h3>
+                <p className="text-3xl font-bold">{systemHealth.activeConnections}</p>
+              </div>
+
+              <div className="p-4 bg-purple-500/10 rounded-lg">
+                <h3 className="text-lg font-medium mb-2">Response Time</h3>
+                <p className="text-3xl font-bold">{systemHealth.avgResponseTime}ms</p>
+              </div>
+
+              <div className="p-4 bg-gray-500/10 rounded-lg">
+                <h3 className="text-lg font-medium mb-2">Last Checked</h3>
+                <p className="text-lg">{systemHealth.lastChecked.toLocaleTimeString()}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-bold">System Logs</h3>
+                <button
+                  onClick={checkSystemHealth}
+                  disabled={isLoading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {isLoading ? 'Checking...' : 'Check Now'}
+                </button>
+              </div>
+
+              <div className="bg-black/20 rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-700">
+                      <th className="p-3 text-left">Timestamp</th>
+                      <th className="p-3 text-left">Type</th>
+                      <th className="p-3 text-left">Message</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {systemHealth.errorLogs.map((log, index) => (
+                      <tr key={index} className="border-b border-gray-700/50">
+                        <td className="p-3 font-mono">{log.timestamp.toLocaleString()}</td>
+                        <td className="p-3">
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs ${
+                              log.type === 'error'
+                                ? 'bg-red-500/20 text-red-300'
+                                : 'bg-yellow-500/20 text-yellow-300'
+                            }`}
+                          >
+                            {log.type}
+                          </span>
+                        </td>
+                        <td className="p-3">{log.message}</td>
+                      </tr>
+                    ))}
+                    {systemHealth.errorLogs.length === 0 && (
+                      <tr>
+                        <td colSpan={3} className="p-3 text-center text-gray-400">
+                          No errors logged
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         );
       case 'users':
         return renderUsersTab();
@@ -1091,8 +1089,8 @@ export default function AdminPage() {
           <div className="flex flex-col items-center gap-4">
             <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
             <p className="text-gray-400">Verifying admin access...</p>
-                  </div>
-                </div>
+          </div>
+        </div>
       </main>
     );
   }
@@ -1147,7 +1145,7 @@ export default function AdminPage() {
                   'leaderboard',
                 ] as const
               ).map(tab => (
-                            <button
+                <button
                   key={tab}
                   onClick={() => {
                     if (tab === 'logs') {
@@ -1163,10 +1161,10 @@ export default function AdminPage() {
                   }`}
                 >
                   {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                            </button>
-                      ))}
+                </button>
+              ))}
             </nav>
-                </div>
+          </div>
 
           <div className="bg-white/5 p-6 rounded-lg shadow-lg">{renderContent()}</div>
         </div>

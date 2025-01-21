@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     // Update the user's email confirmation status
     const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
       email_confirm: isAuthenticated, // This will set email_confirmed_at to current timestamp if true, or null if false
-    });    
+    });
 
     if (updateError) {
       console.error('Error updating user authentication:', updateError);
