@@ -17,7 +17,7 @@ export default function CharactersPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
-  const [showOnlyMyCharacters, setShowOnlyMyCharacters] = useState(false);
+  const [showOnlyMyCharacters, setShowOnlyMyCharacters] = useState(true);
   const supabase = createClientComponentClient();
   const router = useRouter();
 
