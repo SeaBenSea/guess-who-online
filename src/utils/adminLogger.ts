@@ -4,8 +4,10 @@ export type AdminAction =
   | 'room_deletion'
   | 'admin_role_change'
   | 'character_deletion'
+  | 'reset_leaderboard'
   | 'update_username'
-  | 'reset_leaderboard';
+  | 'user_authentication';
+
 export type TargetType = 'room' | 'user' | 'character' | 'leaderboard';
 
 interface LogActionParams {
