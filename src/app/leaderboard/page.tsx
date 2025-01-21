@@ -15,6 +15,7 @@ interface LeaderboardEntry {
 export default function LeaderboardPage() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function fetchLeaderboard() {
@@ -29,6 +30,8 @@ export default function LeaderboardPage() {
       } catch (err) {
         console.error('Error fetching leaderboard:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch leaderboard');
+      } finally {
+        setIsLoading(false);
       }
     }
 
@@ -70,31 +73,52 @@ export default function LeaderboardPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {leaderboard.map((entry, index) => (
-                    <tr key={entry.user_id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-yellow-100 text-yellow-800 font-bold">
-                          {index + 1}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 font-semibold text-gray-900">
-                        {entry.user_metadata?.username || 'Unknown Player'}
-                      </td>
-                      <td className="px-6 py-4 text-gray-600">{entry.games_played}</td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                          {entry.wins}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                          {entry.games_played > 0
-                            ? `${((entry.wins / entry.games_played) * 100).toFixed(1)}%`
-                            : '0%'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {isLoading
+                    ? // Loading skeleton
+                      Array.from({ length: 5 }).map((_, index) => (
+                        <tr key={`skeleton-${index}`} className="animate-pulse">
+                          <td className="px-6 py-4">
+                            <div className="h-8 w-8 rounded-full bg-gray-200"></div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="h-4 w-24 bg-gray-200 rounded"></div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="h-4 w-12 bg-gray-200 rounded"></div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="h-4 w-12 bg-gray-200 rounded"></div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="h-4 w-16 bg-gray-200 rounded"></div>
+                          </td>
+                        </tr>
+                      ))
+                    : leaderboard.map((entry, index) => (
+                        <tr key={entry.user_id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4">
+                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-yellow-100 text-yellow-800 font-bold">
+                              {index + 1}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 font-semibold text-gray-900">
+                            {entry.user_metadata?.username || 'Unknown Player'}
+                          </td>
+                          <td className="px-6 py-4 text-gray-600">{entry.games_played}</td>
+                          <td className="px-6 py-4">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                              {entry.wins}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                              {entry.games_played > 0
+                                ? `${((entry.wins / entry.games_played) * 100).toFixed(1)}%`
+                                : '0%'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
                 </tbody>
               </table>
             </div>
